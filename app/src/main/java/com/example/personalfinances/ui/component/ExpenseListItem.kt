@@ -21,10 +21,17 @@ import com.example.personalfinances.util.CurrencyFormatter
 import com.example.personalfinances.util.DateUtils.toLocalDate
 import java.time.format.DateTimeFormatter
 
+/**
+ * A single row in the expense list.
+ *
+ * Displays [Expense.title] as the primary label, with [ExpenseType.displayName] as a subtitle.
+ * The formatted amount is shown in [ExpenseRed] on the right.
+ *
+ * A repeat icon is shown for recurring expenses, and the formatted date appears below the title.
+ */
 @Composable
 fun ExpenseListItem(
     expense: Expense,
-    categoryName: String?,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -50,13 +57,11 @@ fun ExpenseListItem(
                         )
                     }
                 }
-                if (categoryName != null) {
-                    Text(
-                        text = categoryName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = expense.type.displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(
                     text = expense.date.toLocalDate()
                         .format(DateTimeFormatter.ofPattern("MMM d, yyyy")),

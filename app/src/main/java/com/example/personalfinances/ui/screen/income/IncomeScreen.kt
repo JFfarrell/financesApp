@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.domain.model.Income
+import com.example.personalfinances.domain.model.IncomeType
 import com.example.personalfinances.ui.theme.IncomeGreen
 import com.example.personalfinances.util.CurrencyFormatter
 
@@ -98,8 +99,19 @@ fun IncomeScreen(viewModel: IncomeViewModel = hiltViewModel()) {
     }
 }
 
+/**
+ * A single row in the income list showing the type name, description, cadence, and amount.
+ *
+ * The displayed description is either the user-provided text (for [IncomeType.OTHER]) or the
+ * type's built-in [defaultDescription] for all other types.
+ */
 @Composable
 private fun IncomeListItem(income: Income) {
+    // For OTHER, show the user's custom description. For all fixed types, fall back to the
+    // enum's built-in defaultDescription so the row always has meaningful subtitle text.
+    val descriptionText = income.description?.takeIf { it.isNotBlank() }
+        ?: income.type.defaultDescription
+
     Column {
         Row(
             modifier = Modifier
@@ -110,7 +122,7 @@ private fun IncomeListItem(income: Income) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(income.source, style = MaterialTheme.typography.bodyLarge)
+                    Text(income.type.displayName, style = MaterialTheme.typography.bodyLarge)
                     if (income.cadenceMonths > 0) {
                         Icon(
                             imageVector = Icons.Default.Repeat,
@@ -120,6 +132,11 @@ private fun IncomeListItem(income: Income) {
                         )
                     }
                 }
+                Text(
+                    text = descriptionText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 val cadenceLabel = when (income.cadenceMonths) {
                     0 -> "One-time"
                     1 -> "Monthly"

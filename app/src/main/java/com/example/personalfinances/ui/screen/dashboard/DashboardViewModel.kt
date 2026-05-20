@@ -2,8 +2,6 @@ package com.example.personalfinances.ui.screen.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.personalfinances.domain.model.Category
-import com.example.personalfinances.domain.usecase.category.GetCategoriesUseCase
 import com.example.personalfinances.domain.usecase.expense.GetExpensesByMonthUseCase
 import com.example.personalfinances.domain.usecase.income.GetIncomesUseCase
 import com.example.personalfinances.util.DateUtils
@@ -18,25 +16,17 @@ import kotlinx.coroutines.launch
 import java.time.YearMonth
 import javax.inject.Inject
 
-data class DashboardUiState(
-    val selectedMonth: YearMonth = YearMonth.now(),
-    val totalIncome: Double = 0.0,
-    val totalExpenses: Double = 0.0,
-    val remainder: Double = 0.0,
-    val expensesByCategory: Map<String, Double> = emptyMap(),
-    val isLoading: Boolean = true
-)
-
-sealed class DashboardEvent {
-    object PreviousMonth : DashboardEvent()
-    object NextMonth : DashboardEvent()
-}
-
+/**
+ * Holds all UI state for the Dashboard screen.
+ *
+ * Loads income and expense data for the selected month reactively. When the user navigates
+ * between months, the previous month's collection job is cancelled and a new one started,
+ * preventing stale data from leaking across navigations.
+ */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getExpensesByMonthUseCase: GetExpensesByMonthUseCase,
-    private val getIncomesUseCase: GetIncomesUseCase,
-    private val getCategoriesUseCase: GetCategoriesUseCase
+    private val getIncomesUseCase: GetIncomesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -55,18 +45,15 @@ class DashboardViewModel @Inject constructor(
             val (start, end) = DateUtils.monthBounds(month)
             combine(
                 getExpensesByMonthUseCase(start, end),
-                getIncomesUseCase(start, end),
-                getCategoriesUseCase()
-            ) { expenses, incomes, categories ->
-                val categoryMap: Map<Long, Category> = categories.associateBy { it.id }
+                getIncomesUseCase(start, end)
+            ) { expenses, incomes ->
                 val totalExpenses = expenses.sumOf { it.amount }
                 val totalIncome = incomes.sumOf { it.amount }
+                // Group expenses by their type's display name (e.g. "Fuel / Petrol") now that
+                // categories are replaced by the predefined ExpenseType enum.
                 val byCategory = expenses
-                    .groupBy { expense ->
-                        expense.categoryId?.let { categoryMap[it]?.name } ?: "Uncategorized"
-                    }
+                    .groupBy { it.type.displayName }
                     .mapValues { (_, list) -> list.sumOf { it.amount } }
-
                 Triple(totalExpenses, totalIncome, byCategory)
             }.collect { (totalExpenses, totalIncome, byCategory) ->
                 _uiState.update {
@@ -82,10 +69,34 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    /** Processes a navigation event from the Dashboard screen. */
     fun onEvent(event: DashboardEvent) {
         when (event) {
             DashboardEvent.PreviousMonth -> loadMonth(_uiState.value.selectedMonth.minusMonths(1))
             DashboardEvent.NextMonth -> loadMonth(_uiState.value.selectedMonth.plusMonths(1))
         }
     }
+}
+
+/**
+ * Immutable snapshot of the Dashboard screen's UI state.
+ *
+ * [expensesByCategory] maps each [com.example.personalfinances.domain.model.ExpenseType.displayName]
+ * to the total amount spent under that type for the selected month.
+ */
+data class DashboardUiState(
+    val selectedMonth: YearMonth = YearMonth.now(),
+    val totalIncome: Double = 0.0,
+    val totalExpenses: Double = 0.0,
+    val remainder: Double = 0.0,
+    val expensesByCategory: Map<String, Double> = emptyMap(),
+    val isLoading: Boolean = true
+)
+
+/**
+ * Navigation events for the Dashboard screen.
+ */
+sealed class DashboardEvent {
+    object PreviousMonth : DashboardEvent()
+    object NextMonth : DashboardEvent()
 }

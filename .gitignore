@@ -4,3 +4,12 @@ build
 .gradle
 app/build
 local.properties
+
+# Signing keys
+*.keystore
+*.jks
+
+# SQLite (precaution — Room DBs live on device, not in project)
+*.db
+*.db-shm
+*.db-wal

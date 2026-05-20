@@ -9,18 +9,36 @@ import androidx.room.Update
 import com.example.personalfinances.data.local.db.entity.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Data Access Object for the "expenses" table.
+ *
+ * All query methods return [Flow], so the UI layer receives live updates whenever the
+ * underlying data changes without needing to manually re-fetch.
+ */
 @Dao
 interface ExpenseDao {
 
+    /** Emits all expenses ordered by date descending, updating on any change. */
     @Query("SELECT * FROM expenses ORDER BY date DESC")
     fun getAllExpenses(): Flow<List<ExpenseEntity>>
 
+    /** Emits expenses whose date falls within [monthStart] (inclusive) to [monthEnd] (exclusive). */
     @Query("""
         SELECT * FROM expenses
         WHERE date >= :monthStart AND date < :monthEnd
         ORDER BY date DESC
     """)
     fun getExpensesByMonth(monthStart: Long, monthEnd: Long): Flow<List<ExpenseEntity>>
+
+    /**
+     * Emits the sum of [ExpenseEntity.amount] for all rows whose [ExpenseEntity.type] is in
+     * [types]. Returns 0.0 when no matching rows exist (via COALESCE).
+     *
+     * Used to compute the savings total from SAVINGS_MONTHLY and SAVINGS_EXTRA entries.
+     * Room supports [List] parameters in IN clauses natively.
+     */
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE type IN (:types)")
+    fun getTotalByTypes(types: List<String>): Flow<Double>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: ExpenseEntity): Long

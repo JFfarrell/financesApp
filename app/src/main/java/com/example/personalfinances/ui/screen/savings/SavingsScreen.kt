@@ -36,6 +36,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.ui.component.CircularProgressArc
 import com.example.personalfinances.util.CurrencyFormatter
 
+/**
+ * Root composable for the Savings screen.
+ *
+ * Displays a circular progress arc showing progress toward the savings goal. The "Saved" total
+ * is computed automatically from the starting amount + all SAVINGS-type expenses — it cannot be
+ * edited directly. The user can set a "Starting Amount" (pre-app savings seed) and a goal target.
+ *
+ * When the user adds a SAVINGS expense anywhere in the app, this screen updates automatically
+ * because both data sources are combined reactively in [SavingsViewModel].
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
@@ -67,13 +77,15 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
+                        // progressFraction now takes currentSaved as a parameter because the value
+                        // is computed at runtime, not stored on the model.
                         CircularProgressArc(
-                            progressFraction = uiState.goal.progressFraction,
+                            progressFraction = uiState.goal.progressFraction(uiState.currentSaved),
                             size = 200.dp,
                             strokeWidth = 20.dp
                         )
                         Text(
-                            text = "${(uiState.goal.progressFraction * 100).toInt()}%",
+                            text = "${(uiState.goal.progressFraction(uiState.currentSaved) * 100).toInt()}%",
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -81,7 +93,7 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                     }
 
                     Text(
-                        text = "Saved: ${CurrencyFormatter.format(uiState.goal.currentSaved)}",
+                        text = "Saved: ${CurrencyFormatter.format(uiState.currentSaved)}",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
@@ -89,11 +101,18 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Text(
+                        text = "Starting amount: ${CurrencyFormatter.format(uiState.goal.startingAmount)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Button(onClick = { viewModel.onEvent(SavingsEvent.ShowEditSaved) }) {
-                        Text("Update Amount Saved")
+                    // Sets the pre-app savings seed value. This is distinct from "Update Amount
+                    // Saved" — the user isn't manually tracking a total, just seeding the baseline.
+                    Button(onClick = { viewModel.onEvent(SavingsEvent.ShowEditStartingAmount) }) {
+                        Text("Set Starting Amount")
                     }
                 }
             }
@@ -109,16 +128,22 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
         )
     }
 
-    if (uiState.isEditingSaved) {
+    if (uiState.isEditingStartingAmount) {
         AmountEditDialog(
-            title = "Update Amount Saved",
-            currentValue = uiState.goal.currentSaved,
-            onDismiss = { viewModel.onEvent(SavingsEvent.HideEditSaved) },
-            onConfirm = { value -> viewModel.onEvent(SavingsEvent.UpdateCurrentSaved(value)) }
+            title = "Set Starting Amount",
+            currentValue = uiState.goal.startingAmount,
+            onDismiss = { viewModel.onEvent(SavingsEvent.HideEditStartingAmount) },
+            onConfirm = { value -> viewModel.onEvent(SavingsEvent.UpdateStartingAmount(value)) }
         )
     }
 }
 
+/**
+ * Generic dialog for editing a single numeric amount.
+ *
+ * [currentValue] pre-fills the text field. The confirm button is disabled until the input
+ * parses as a valid [Double].
+ */
 @Composable
 private fun AmountEditDialog(
     title: String,
@@ -143,9 +168,7 @@ private fun AmountEditDialog(
         },
         confirmButton = {
             Button(
-                onClick = {
-                    text.toDoubleOrNull()?.let { onConfirm(it) }
-                },
+                onClick = { text.toDoubleOrNull()?.let { onConfirm(it) } },
                 enabled = text.toDoubleOrNull() != null
             ) {
                 Text("Save")

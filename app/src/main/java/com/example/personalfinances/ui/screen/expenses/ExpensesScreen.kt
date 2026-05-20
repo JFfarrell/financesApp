@@ -22,11 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.ui.component.ExpenseListItem
 
+/**
+ * Root composable for the Expenses screen.
+ *
+ * Observes [ExpensesViewModel.uiState] and delegates rendering to child composables.
+ * User interactions are forwarded to [ExpensesViewModel.onEvent].
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    val categoryMap = uiState.categories.associateBy { it.id }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Expenses") }) },
@@ -49,10 +54,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 )
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.expenses, key = { it.id }) { expense ->
-                        ExpenseListItem(
-                            expense = expense,
-                            categoryName = expense.categoryId?.let { categoryMap[it]?.name }
-                        )
+                        ExpenseListItem(expense = expense)
                     }
                 }
             }
@@ -61,9 +63,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
 
     if (uiState.isAddSheetVisible) {
         AddExpenseBottomSheet(
-            categories = uiState.categories,
             onDismiss = { viewModel.onEvent(ExpensesEvent.HideAddSheet) },
-            onAddCategory = { name -> viewModel.onEvent(ExpensesEvent.AddCategory(name)) },
             onSave = { event -> viewModel.onEvent(event) }
         )
     }

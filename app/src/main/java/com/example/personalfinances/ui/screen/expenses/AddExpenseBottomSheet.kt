@@ -10,17 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,15 +26,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.personalfinances.domain.model.Category
+import com.example.personalfinances.domain.model.ExpenseCategory
+import com.example.personalfinances.domain.model.ExpenseType
+import com.example.personalfinances.ui.component.HierarchicalTypeField
 import com.example.personalfinances.util.DateUtils
 
+/**
+ * Modal bottom sheet for adding a new expense entry.
+ *
+ * The sheet collects:
+ * - Amount (decimal number, required)
+ * - Title (short label for this specific entry, required)
+ * - Category + Type (two-step picker via [HierarchicalTypeField], both required)
+ * - Description (optional note; required when type is an `*_OTHER` variant)
+ * - Recurring toggle + cadence
+ *
+ * The Save button is disabled until amount, title, and type are all provided, and — for
+ * `*_OTHER` types — a description has also been entered.
+ *
+ * @param onDismiss Called when the sheet is dismissed without saving.
+ * @param onSave Called with the completed [ExpensesEvent.AddExpense] when the user taps Save.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseBottomSheet(
-    categories: List<Category>,
     onDismiss: () -> Unit,
-    onAddCategory: (String) -> Unit,
     onSave: (ExpensesEvent.AddExpense) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -47,21 +58,17 @@ fun AddExpenseBottomSheet(
     var amountText by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
+    var selectedType by remember { mutableStateOf<ExpenseType?>(null) }
     var isRecurring by remember { mutableStateOf(false) }
     var cadenceText by remember { mutableStateOf("1") }
-    var categoryDropdownExpanded by remember { mutableStateOf(false) }
-    var showNewCategoryDialog by remember { mutableStateOf(false) }
 
-    if (showNewCategoryDialog) {
-        NewCategoryDialog(
-            onDismiss = { showNewCategoryDialog = false },
-            onConfirm = { name ->
-                onAddCategory(name)
-                showNewCategoryDialog = false
-            }
-        )
-    }
+    // Description is only required for *_OTHER types; title is always required.
+    val needsDescription = selectedType?.isDescriptionEditable == true
+    val isSaveEnabled = amountText.isNotBlank()
+        && title.isNotBlank()
+        && selectedType != null
+        && (!needsDescription || description.isNotBlank())
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -89,51 +96,37 @@ fun AddExpenseBottomSheet(
                 value = title,
                 onValueChange = { title = it },
                 label = { Text("Title") },
+                placeholder = { Text("e.g. Tesco, Monthly gym, Shell") },
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Description (optional)") },
+            // Two-step hierarchical type picker: category → subtype.
+            // The type picker shows the built-in defaultDescription as helper text below the
+            // subtype dropdown. The separate description field below is always shown and required.
+            HierarchicalTypeField(
+                categories = ExpenseCategory.entries,
+                categoryDisplayName = { it.displayName },
+                subtypesForCategory = { category ->
+                    ExpenseType.entries.filter { it.category == category }
+                },
+                selectedCategory = selectedCategory,
+                selectedType = selectedType,
+                onCategorySelected = { category ->
+                    selectedCategory = category
+                    selectedType = null
+                },
+                onTypeSelected = { selectedType = it },
                 modifier = Modifier.fillMaxWidth()
             )
 
-            ExposedDropdownMenuBox(
-                expanded = categoryDropdownExpanded,
-                onExpandedChange = { categoryDropdownExpanded = it }
-            ) {
+            if (needsDescription) {
                 OutlinedTextField(
-                    value = selectedCategory?.name ?: "Select category",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Category") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    placeholder = { Text("Describe this expense") },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                ExposedDropdownMenu(
-                    expanded = categoryDropdownExpanded,
-                    onDismissRequest = { categoryDropdownExpanded = false }
-                ) {
-                    categories.forEach { category ->
-                        DropdownMenuItem(
-                            text = { Text(category.name) },
-                            onClick = {
-                                selectedCategory = category
-                                categoryDropdownExpanded = false
-                            }
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = { Text("+ Add new category") },
-                        onClick = {
-                            categoryDropdownExpanded = false
-                            showNewCategoryDialog = true
-                        }
-                    )
-                }
             }
 
             Row(
@@ -160,13 +153,14 @@ fun AddExpenseBottomSheet(
             Button(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: return@Button
+                    val type = selectedType ?: return@Button
                     val cadence = if (isRecurring) cadenceText.toIntOrNull() ?: 1 else 0
                     onSave(
                         ExpensesEvent.AddExpense(
                             amount = amount,
                             title = title,
                             description = description,
-                            categoryId = selectedCategory?.id,
+                            type = type,
                             date = DateUtils.todayEpochMillis(),
                             isRecurring = isRecurring,
                             cadenceMonths = cadence
@@ -174,38 +168,10 @@ fun AddExpenseBottomSheet(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = amountText.isNotBlank() && title.isNotBlank()
+                enabled = isSaveEnabled
             ) {
                 Text("Save Expense")
             }
         }
     }
-}
-
-@Composable
-private fun NewCategoryDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New Category") },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Category name") }
-            )
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }

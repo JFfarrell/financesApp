@@ -67,7 +67,7 @@ fun MonthlyScreen(viewModel: MonthlyViewModel = hiltViewModel()) {
                                     )
                                 }
                                 items(uiState.expenses, key = { it.id }) { expense ->
-                                    ExpenseListItem(expense = expense, categoryName = null)
+                                    ExpenseListItem(expense = expense)
                                 }
                             }
 
@@ -80,7 +80,7 @@ fun MonthlyScreen(viewModel: MonthlyViewModel = hiltViewModel()) {
                                     )
                                 }
                                 items(uiState.recurringExpenses, key = { "r_${it.id}" }) { expense ->
-                                    ExpenseListItem(expense = expense, categoryName = null)
+                                    ExpenseListItem(expense = expense)
                                 }
                             }
                         }
