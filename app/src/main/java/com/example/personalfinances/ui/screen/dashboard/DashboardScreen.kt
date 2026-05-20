@@ -36,7 +36,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Dashboard") }) }
+        topBar = { TopAppBar(title = { Text("Home") }) }
     ) { innerPadding ->
         Column(
             modifier = Modifier

@@ -1,10 +1,8 @@
 package com.example.personalfinances.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -23,11 +21,9 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(AppDestination.Expenses, Icons.Default.Receipt, "Expenses"),
-    BottomNavItem(AppDestination.Monthly, Icons.Default.CalendarMonth, "Monthly"),
-    BottomNavItem(AppDestination.Income, Icons.Default.AttachMoney, "Income"),
-    BottomNavItem(AppDestination.Dashboard, Icons.Default.Home, "Home"),
-    BottomNavItem(AppDestination.Savings, Icons.Default.Savings, "Savings")
+    BottomNavItem(AppDestination.Home,     Icons.Default.Home,          "Home"),
+    BottomNavItem(AppDestination.Calendar, Icons.Default.CalendarMonth, "Calendar"),
+    BottomNavItem(AppDestination.Savings,  Icons.Default.Savings,       "Savings")
 )
 
 @Composable
@@ -41,7 +37,7 @@ fun BottomNavBar(navController: NavHostController) {
                 selected = currentRoute == item.destination.route,
                 onClick = {
                     navController.navigate(item.destination.route) {
-                        popUpTo(AppDestination.Expenses.route) {
+                        popUpTo(AppDestination.Home.route) {
                             saveState = true
                         }
                         launchSingleTop = true

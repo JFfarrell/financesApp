@@ -26,45 +26,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.personalfinances.domain.model.Expense
 import com.example.personalfinances.domain.model.ExpenseCategory
 import com.example.personalfinances.domain.model.ExpenseType
 import com.example.personalfinances.ui.component.HierarchicalTypeField
-import com.example.personalfinances.util.DateUtils
 
 /**
- * Modal bottom sheet for adding a new expense entry.
+ * Modal bottom sheet for adding or editing an expense entry.
  *
- * The sheet collects:
- * - Amount (decimal number, required)
- * - Title (short label for this specific entry, required)
- * - Category + Type (two-step picker via [HierarchicalTypeField], both required)
- * - Description (optional note; required when type is an `*_OTHER` variant)
- * - Recurring toggle + cadence
+ * When [initialExpense] is null the sheet is in Add mode; when non-null it pre-populates all
+ * fields and switches the title and save button label to "Edit".
  *
- * The Save button is disabled until amount, title, and type are all provided, and — for
- * `*_OTHER` types — a description has also been entered.
+ * [defaultDateMillis] is used as the expense date in Add mode only; in Edit mode the original
+ * date is preserved.
  *
+ * @param initialExpense Pre-populated expense for Edit mode, or null for Add mode.
+ * @param defaultDateMillis Epoch millis for the first day of the currently selected month.
  * @param onDismiss Called when the sheet is dismissed without saving.
- * @param onSave Called with the completed [ExpensesEvent.AddExpense] when the user taps Save.
+ * @param onSave Called with the completed [Expense] when the user taps Save.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseBottomSheet(
+    initialExpense: Expense? = null,
+    defaultDateMillis: Long,
     onDismiss: () -> Unit,
-    onSave: (ExpensesEvent.AddExpense) -> Unit
+    onSave: (Expense) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
+    val isEditMode = initialExpense != null
 
-    var amountText by remember { mutableStateOf("") }
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
-    var selectedType by remember { mutableStateOf<ExpenseType?>(null) }
-    var isRecurring by remember { mutableStateOf(false) }
-    var cadenceText by remember { mutableStateOf("1") }
+    var amountText by remember { mutableStateOf(initialExpense?.amount?.toString() ?: "") }
+    var title by remember { mutableStateOf(initialExpense?.title ?: "") }
+    var description by remember { mutableStateOf(initialExpense?.description ?: "") }
+    var selectedCategory by remember { mutableStateOf(initialExpense?.type?.category) }
+    var selectedType by remember { mutableStateOf<ExpenseType?>(initialExpense?.type) }
+    var isRecurring by remember { mutableStateOf(initialExpense?.isRecurring ?: false) }
+    var cadenceText by remember { mutableStateOf(
+        initialExpense?.cadenceMonths?.takeIf { it > 0 }?.toString() ?: "1"
+    ) }
 
-    // Description is only required for *_OTHER types; title is always required.
     val needsDescription = selectedType?.isDescriptionEditable == true
     val isSaveEnabled = amountText.isNotBlank()
         && title.isNotBlank()
@@ -84,7 +87,10 @@ fun AddExpenseBottomSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Add Expense", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+            Text(
+                if (isEditMode) "Edit Expense" else "Add Expense",
+                style = androidx.compose.material3.MaterialTheme.typography.titleLarge
+            )
 
             OutlinedTextField(
                 value = amountText,
@@ -102,9 +108,6 @@ fun AddExpenseBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Two-step hierarchical type picker: category → subtype.
-            // The type picker shows the built-in defaultDescription as helper text below the
-            // subtype dropdown. The separate description field below is always shown and required.
             HierarchicalTypeField(
                 categories = ExpenseCategory.entries,
                 categoryDisplayName = { it.displayName },
@@ -158,12 +161,13 @@ fun AddExpenseBottomSheet(
                     val type = selectedType ?: return@Button
                     val cadence = if (isRecurring) cadenceText.toIntOrNull() ?: 1 else 0
                     onSave(
-                        ExpensesEvent.AddExpense(
+                        Expense(
+                            id = initialExpense?.id ?: 0,
                             amount = amount,
                             title = title,
                             description = description,
                             type = type,
-                            date = DateUtils.todayEpochMillis(),
+                            date = initialExpense?.date ?: defaultDateMillis,
                             isRecurring = isRecurring,
                             cadenceMonths = cadence
                         )
@@ -172,7 +176,7 @@ fun AddExpenseBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isSaveEnabled
             ) {
-                Text("Save Expense")
+                Text(if (isEditMode) "Save Changes" else "Save Expense")
             }
         }
     }

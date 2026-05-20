@@ -28,15 +28,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.personalfinances.domain.model.Income
 import com.example.personalfinances.domain.model.IncomeType
 import com.example.personalfinances.ui.component.TransactionTypeField
-import com.example.personalfinances.util.DateUtils
 
 /**
- * Cadence options available when adding an income entry.
+ * Cadence options available when adding or editing an income entry.
  *
- * [months] maps to the [Income.cadenceMonths] field. A value of 0 means one-time;
- * -1 is a sentinel for the "Custom" option which reveals a manual entry field.
+ * [months] maps to [Income.cadenceMonths]. A value of 0 means one-time; -1 is a sentinel for
+ * the "Custom" option which reveals a manual entry field.
  */
 private enum class CadenceOption(val label: String, val months: Int) {
     OneTime("One-time", 0),
@@ -47,40 +47,53 @@ private enum class CadenceOption(val label: String, val months: Int) {
     Custom("Custom…", -1)
 }
 
+private fun cadenceOptionFor(months: Int): CadenceOption =
+    CadenceOption.entries.firstOrNull { it.months == months && it != CadenceOption.Custom }
+        ?: CadenceOption.Custom
+
 /**
- * Modal bottom sheet for adding a new income entry.
+ * Modal bottom sheet for adding or editing an income entry.
  *
- * The sheet collects:
- * - Amount (decimal number)
- * - Type (selected from the fixed [IncomeType] enum via [TransactionTypeField])
- * - Description (mandatory free text, only shown when type is [IncomeType.OTHER])
- * - Cadence (how often the income recurs, or one-time)
+ * When [initialIncome] is null the sheet is in Add mode; when non-null it pre-populates all
+ * fields and switches the title and save button label to "Edit".
  *
- * The Save button is disabled until the amount is non-blank and, if the type is OTHER,
- * the description is also non-blank.
+ * [defaultDateMillis] is used as [Income.startDate] in Add mode only; in Edit mode the original
+ * start date is preserved.
  *
+ * @param initialIncome Pre-populated income for Edit mode, or null for Add mode.
+ * @param defaultDateMillis Epoch millis for the first day of the currently selected month.
  * @param onDismiss Called when the sheet is dismissed without saving.
- * @param onSave Called with the completed [IncomeEvent.AddIncome] when the user taps Save.
+ * @param onSave Called with the completed [Income] when the user taps Save.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddIncomeBottomSheet(
+    initialIncome: Income? = null,
+    defaultDateMillis: Long,
     onDismiss: () -> Unit,
-    onSave: (IncomeEvent.AddIncome) -> Unit
+    onSave: (Income) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
+    val isEditMode = initialIncome != null
 
-    var amountText by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf<IncomeType?>(null) }
-    var description by remember { mutableStateOf("") }
-    var cadenceOption by remember { mutableStateOf(CadenceOption.Monthly) }
-    var customCadenceText by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf(initialIncome?.amount?.toString() ?: "") }
+    var selectedType by remember { mutableStateOf<IncomeType?>(initialIncome?.type) }
+    var description by remember { mutableStateOf(initialIncome?.description ?: "") }
+    var cadenceOption by remember {
+        mutableStateOf(
+            if (initialIncome != null) cadenceOptionFor(initialIncome.cadenceMonths)
+            else CadenceOption.Monthly
+        )
+    }
+    var customCadenceText by remember {
+        mutableStateOf(
+            if (initialIncome != null && cadenceOptionFor(initialIncome.cadenceMonths) == CadenceOption.Custom)
+                initialIncome.cadenceMonths.toString()
+            else ""
+        )
+    }
     var cadenceDropdownExpanded by remember { mutableStateOf(false) }
 
-    // The Save button is enabled when:
-    //   1. An amount has been entered, AND
-    //   2. A type has been selected, AND
-    //   3. If the type is OTHER, a description has been provided
     val isSaveEnabled = amountText.isNotBlank()
         && selectedType != null
         && (selectedType != IncomeType.OTHER || description.isNotBlank())
@@ -98,7 +111,10 @@ fun AddIncomeBottomSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Add Income", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (isEditMode) "Edit Income" else "Add Income",
+                style = MaterialTheme.typography.titleLarge
+            )
 
             OutlinedTextField(
                 value = amountText,
@@ -108,8 +124,6 @@ fun AddIncomeBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // TransactionTypeField handles both the type dropdown and the description area.
-            // It is generic, so it can be reused identically for expense types in the future.
             TransactionTypeField(
                 types = IncomeType.entries,
                 selectedType = selectedType,
@@ -172,19 +186,20 @@ fun AddIncomeBottomSheet(
                         else -> cadenceOption.months
                     }
                     onSave(
-                        IncomeEvent.AddIncome(
+                        Income(
+                            id = initialIncome?.id ?: 0,
                             amount = amount,
                             type = type,
                             description = description.takeIf { it.isNotBlank() },
                             cadenceMonths = cadence,
-                            startDate = DateUtils.todayEpochMillis()
+                            startDate = initialIncome?.startDate ?: defaultDateMillis
                         )
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isSaveEnabled
             ) {
-                Text("Save Income")
+                Text(if (isEditMode) "Save Changes" else "Save Income")
             }
         }
     }

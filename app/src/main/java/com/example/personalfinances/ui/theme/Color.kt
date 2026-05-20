@@ -10,6 +10,6 @@ val Purple40 = Color(0xFF6650A4)
 val PurpleGrey40 = Color(0xFF625B71)
 val Pink40 = Color(0xFF7D5260)
 
-val IncomeGreen = Color(0xFF2E7D32)
-val ExpenseRed = Color(0xFFC62828)
+val IncomeGreen = Color(0xFF80AF80)
+val ExpenseRed = Color(0xFFEF8080)
 val NeutralGray = Color(0xFFE0E0E0)

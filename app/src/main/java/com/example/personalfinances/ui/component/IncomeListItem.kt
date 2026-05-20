@@ -16,26 +16,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.personalfinances.domain.model.Expense
-import com.example.personalfinances.ui.theme.ExpenseRed
+import com.example.personalfinances.domain.model.Income
+import com.example.personalfinances.domain.model.IncomeType
+import com.example.personalfinances.ui.theme.IncomeGreen
 import com.example.personalfinances.util.CurrencyFormatter
-import com.example.personalfinances.util.DateUtils.toLocalDate
-import java.time.format.DateTimeFormatter
 
 /**
- * A single row in the expense list.
+ * A single row in the income list showing type name, description, cadence, and amount.
  *
- * Displays [Expense.title] as the primary label, with [ExpenseType.displayName] as a subtitle.
- * The formatted amount is shown in [ExpenseRed] on the right.
- *
- * A repeat icon is shown for recurring expenses, and the formatted date appears below the title.
+ * The displayed description is the user-provided text for [IncomeType.OTHER], or the type's
+ * built-in [defaultDescription] for all other types.
  */
 @Composable
-fun ExpenseListItem(
-    expense: Expense,
+fun IncomeListItem(
+    income: Income,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val descriptionText = income.description?.takeIf { it.isNotBlank() }
+        ?: income.type.defaultDescription
+
+    val cadenceLabel = when (income.cadenceMonths) {
+        0 -> "One-time"
+        1 -> "Monthly"
+        else -> "Every ${income.cadenceMonths} months"
+    }
+
     Column(modifier = modifier.clickable(onClick = onClick)) {
         Row(
             modifier = Modifier
@@ -46,11 +52,8 @@ fun ExpenseListItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = expense.title,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    if (expense.isRecurring) {
+                    Text(income.type.displayName, style = MaterialTheme.typography.bodyLarge)
+                    if (income.cadenceMonths > 0) {
                         Icon(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = "Recurring",
@@ -60,21 +63,20 @@ fun ExpenseListItem(
                     }
                 }
                 Text(
-                    text = expense.type.displayName,
+                    text = descriptionText,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = expense.date.toLocalDate()
-                        .format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                    text = cadenceLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = CurrencyFormatter.format(expense.amount),
+                text = CurrencyFormatter.format(income.amount),
                 style = MaterialTheme.typography.bodyLarge,
-                color = ExpenseRed
+                color = IncomeGreen
             )
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

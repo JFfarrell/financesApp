@@ -10,9 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.personalfinances.ui.screen.auth.LoginScreen
 import com.example.personalfinances.ui.screen.dashboard.DashboardScreen
-import com.example.personalfinances.ui.screen.expenses.ExpensesScreen
-import com.example.personalfinances.ui.screen.income.IncomeScreen
-import com.example.personalfinances.ui.screen.monthly.MonthlyScreen
+import com.example.personalfinances.ui.screen.monthly.CalendarScreen
 import com.example.personalfinances.ui.screen.savings.SavingsScreen
 
 @Composable
@@ -44,14 +42,12 @@ fun MainScaffold() {
     ) { innerPadding ->
         NavHost(
             navController = bottomNavController,
-            startDestination = AppDestination.Expenses.route,
+            startDestination = AppDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(AppDestination.Expenses.route) { ExpensesScreen() }
-            composable(AppDestination.Monthly.route) { MonthlyScreen() }
-            composable(AppDestination.Income.route) { IncomeScreen() }
-            composable(AppDestination.Dashboard.route) { DashboardScreen() }
-            composable(AppDestination.Savings.route) { SavingsScreen() }
+            composable(AppDestination.Home.route)     { DashboardScreen() }
+            composable(AppDestination.Calendar.route) { CalendarScreen() }
+            composable(AppDestination.Savings.route)  { SavingsScreen() }
         }
     }
 }

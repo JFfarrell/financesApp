@@ -63,13 +63,9 @@ In `AddExpenseBottomSheet`, when the user selects any `SAVINGS_*` type, automati
 ---
 
 ### 8. Expense Date Picker + Edit and Delete
-**Status:** To do
+**Status:** Done
 
-- **Date picker:** replace the hardcoded `DateUtils.todayEpochMillis()` with a month/year picker so the user can log an expense for any month.
-- **Edit expense:** tap an expense in the list to open a pre-populated sheet and update it.
-- **Delete expense:** swipe-to-dismiss or a long-press menu on the expense list item.
-
-**Complexity:** Medium — new UI, new `UpdateExpense` use case and DAO method, date picker dialog.
+Collapsed Expenses and Income into a redesigned Calendar screen. Entries for any month can be added via two inline buttons. Tap an item to edit (pre-populated sheet), swipe left to delete. Both expenses and income are fully editable. Nav reduced to Home / Calendar / Savings.
 
 ---
 
