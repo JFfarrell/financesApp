@@ -87,11 +87,9 @@ This requires a way to identify "linked" recurring entries (e.g. a shared `recur
 ---
 
 ### 10. Bottom Nav "Dashboard" Label Overflow
-**Status:** To do
+**Status:** Done
 
-The "Dashboard" label on the bottom navigation bar is too wide and wraps to two lines. Fix by truncating, abbreviating, or resizing so it fits on one line.
-
-**Complexity:** Small — label text or nav bar style tweak.
+Renamed label to "Home" and updated icon to `Icons.Default.Home`.
 
 ---
 

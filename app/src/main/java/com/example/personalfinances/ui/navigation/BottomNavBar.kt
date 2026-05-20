@@ -3,7 +3,7 @@ package com.example.personalfinances.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Icon
@@ -26,7 +26,7 @@ val bottomNavItems = listOf(
     BottomNavItem(AppDestination.Expenses, Icons.Default.Receipt, "Expenses"),
     BottomNavItem(AppDestination.Monthly, Icons.Default.CalendarMonth, "Monthly"),
     BottomNavItem(AppDestination.Income, Icons.Default.AttachMoney, "Income"),
-    BottomNavItem(AppDestination.Dashboard, Icons.Default.Dashboard, "Dashboard"),
+    BottomNavItem(AppDestination.Dashboard, Icons.Default.Home, "Home"),
     BottomNavItem(AppDestination.Savings, Icons.Default.Savings, "Savings")
 )
 
