@@ -31,14 +31,14 @@ interface ExpenseDao {
     fun getExpensesByMonth(monthStart: Long, monthEnd: Long): Flow<List<ExpenseEntity>>
 
     /**
-     * Emits the sum of [ExpenseEntity.amount] for all rows whose [ExpenseEntity.type] is in
-     * [types]. Returns 0.0 when no matching rows exist (via COALESCE).
+     * Emits the sum of [ExpenseEntity.amount] for rows whose [ExpenseEntity.type] is in [types]
+     * and whose [ExpenseEntity.date] is on or before [upToDate]. Returns 0.0 when no rows match.
      *
-     * Used to compute the savings total from SAVINGS_MONTHLY and SAVINGS_EXTRA entries.
-     * Room supports [List] parameters in IN clauses natively.
+     * The [upToDate] cutoff ensures future recurring entries are not counted until their month
+     * arrives. Pass [System.currentTimeMillis] as the cutoff for a "today and earlier" total.
      */
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE type IN (:types)")
-    fun getTotalByTypes(types: List<String>): Flow<Double>
+    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE type IN (:types) AND date <= :upToDate")
+    fun getTotalByTypes(types: List<String>, upToDate: Long): Flow<Double>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: ExpenseEntity): Long

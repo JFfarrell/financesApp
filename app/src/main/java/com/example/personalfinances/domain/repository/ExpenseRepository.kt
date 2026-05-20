@@ -17,14 +17,13 @@ interface ExpenseRepository {
     fun getExpensesByMonth(monthStart: Long, monthEnd: Long): Flow<List<Expense>>
 
     /**
-     * Emits the running sum of [Expense.amount] for all entries whose type name is in [types].
-     * Emits 0.0 when no matching expenses exist.
+     * Emits the running sum of [Expense.amount] for entries whose type name is in [types] and
+     * whose date is on or before [upToDate]. Emits 0.0 when no matching expenses exist.
      *
-     * Used by the savings screen to derive the current saved total from
-     * [com.example.personalfinances.domain.model.ExpenseType.SAVINGS_MONTHLY] and
-     * [com.example.personalfinances.domain.model.ExpenseType.SAVINGS_EXTRA] entries.
+     * [upToDate] is an epoch-millis cutoff that prevents future recurring entries from being
+     * counted before their month arrives.
      */
-    fun getTotalByTypes(types: List<String>): Flow<Double>
+    fun getTotalByTypes(types: List<String>, upToDate: Long): Flow<Double>
 
     suspend fun addExpense(expense: Expense)
     suspend fun deleteExpense(expense: Expense)

@@ -26,7 +26,7 @@ New screen showing a scrollable grid — rows = income/expense types, columns = 
 ### 3. Expense Types + Savings Integration
 **Status:** Done
 
-Replaced the flat user-managed `categories` system with a two-level predefined hierarchy: `ExpenseCategory` (Housing, Household, Transport, Lifestyle, Savings) → `ExpenseType` (24 subtypes, each implementing `TransactionType`). `*_OTHER` subtypes have editable descriptions. Added `HierarchicalTypeField` composable for the two-step picker. Savings goal `currentSaved` is now derived (`startingAmount + sum of SAVINGS expenses`) rather than manually entered. DB version bumped to 3.
+Replaced the flat user-managed `categories` system with a two-level predefined hierarchy: `ExpenseCategory` (Housing, Household, Transport, Lifestyle, Savings) → `ExpenseType` (24 subtypes, each implementing `TransactionType`). `*_OTHER` subtypes have editable descriptions. Added `HierarchicalTypeField` composable for the two-step picker. Savings goal `currentSaved` is now derived (`startingAmount + sum of past/current-month SAVINGS expenses`) rather than manually entered. Future recurring savings entries are excluded until their month arrives. DB version bumped to 3.
 
 ---
 

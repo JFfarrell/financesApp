@@ -25,8 +25,8 @@ class ExpenseRepositoryImpl @Inject constructor(
     override fun getExpensesByMonth(monthStart: Long, monthEnd: Long): Flow<List<Expense>> =
         dao.getExpensesByMonth(monthStart, monthEnd).map { list -> list.map { it.toDomain() } }
 
-    override fun getTotalByTypes(types: List<String>): Flow<Double> =
-        dao.getTotalByTypes(types)
+    override fun getTotalByTypes(types: List<String>, upToDate: Long): Flow<Double> =
+        dao.getTotalByTypes(types, upToDate)
 
     override suspend fun addExpense(expense: Expense) {
         dao.insertExpense(expense.toEntity())
