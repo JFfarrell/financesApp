@@ -12,15 +12,16 @@ Android personal finance tracker built with Jetpack Compose, Room, Hilt, and Kot
 
 ## Key Patterns
 - **Adding a new entity:** Follow the existing category pattern — entity → DAO → mapper → domain model → repository interface + impl → use cases → ViewModel state + events → UI. Register the DAO in `DatabaseModule` and bind the repository in `RepositoryModule`.
-- **Reactive data:** All data flows through Kotlin `Flow`. Use `combine()` in ViewModels when a screen needs multiple data sources (see `ExpensesViewModel`).
-- **Category dropdown UI:** See `AddExpenseBottomSheet.kt` — `ExposedDropdownMenuBox` with an inline "+ Add new category" dialog. Mirror this for any new category-like picker.
+- **Reactive data:** All data flows through Kotlin `Flow`. Use `combine()` in ViewModels when a screen needs multiple data sources (see `CalendarViewModel` which combines expenses + income).
+- **Hierarchical type picker:** See `HierarchicalTypeField.kt` — two-step `ExposedDropdownMenuBox` (category → subtype). See `AddExpenseBottomSheet.kt` for usage. Mirror this for any new two-level picker.
+- **Keyboard / IME handling:** `enableEdgeToEdge()` is called in `MainActivity` so the system reports IME insets. Screens that use `Scaffold` get this for free via `innerPadding`. Screens without a `Scaffold` (e.g. `LoginScreen`) need `Modifier.systemBarsPadding().imePadding()` on their root. `ModalBottomSheet` content needs `.imePadding()` on its Column, placed before `verticalScroll()` so the keyboard pushes content up and the user can scroll to any field.
 - **DB changes:** Bump `version` in `AppDatabase.kt`. `fallbackToDestructiveMigration()` is set — no migration SQL needed during development, but existing data will be wiped on upgrade.
 - **Pre-populating data:** Add a `RoomDatabase.Callback` in `DatabaseModule` and insert seed rows in `onCreate`.
 
 ## Database
 - Room SQLite, database name: `personal_finances.db`
-- Entities: `ExpenseEntity`, `IncomeEntity`, `CategoryEntity`, `SavingsGoalEntity`
-- Current version: 1
+- Entities: `ExpenseEntity`, `IncomeEntity`, `SavingsGoalEntity`
+- Current version: 6 (full history in `AppDatabase.kt`)
 
 ## Code Style
 - Add KDoc docstrings to all classes and functions — including composables, ViewModels, use cases, DAOs, repositories, and mappers. Briefly explain what each does and, where non-obvious, why.
@@ -33,7 +34,8 @@ Check `BACKLOG.md` for the current list of planned features and their status. Pi
 
 ## Testing
 No automated tests currently exist. Verify changes manually by building and running the app on an emulator or device. Key flows to check after any change:
-- Add / delete an expense with a category
-- Add / delete an income entry
-- Dashboard monthly summary updates correctly
+- Add / delete an expense (one-off and recurring series)
+- Add / delete an income entry (one-off and recurring series)
+- Calendar month navigation loads correct transactions
+- Home screen summary updates correctly
 - Existing data is unaffected by schema changes (or wipe is expected and noted)

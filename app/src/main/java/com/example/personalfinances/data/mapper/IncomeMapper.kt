@@ -20,8 +20,10 @@ fun IncomeEntity.toDomain() = Income(
     amount = amount,
     type = IncomeType.valueOf(type),
     description = description,
+    isRecurring = isRecurring,
     cadenceMonths = cadenceMonths,
-    startDate = startDate
+    startDate = startDate,
+    recurringGroupId = recurringGroupId
 )
 
 /** Converts a domain [Income] model to a [IncomeEntity] ready for database insertion. */
@@ -30,6 +32,8 @@ fun Income.toEntity() = IncomeEntity(
     amount = amount,
     type = type.name,
     description = description,
+    isRecurring = isRecurring,
     cadenceMonths = cadenceMonths,
-    startDate = startDate
+    startDate = startDate,
+    recurringGroupId = recurringGroupId
 )

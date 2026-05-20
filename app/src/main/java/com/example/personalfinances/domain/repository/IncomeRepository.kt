@@ -9,4 +9,6 @@ interface IncomeRepository {
     suspend fun addIncome(income: Income)
     suspend fun deleteIncome(income: Income)
     suspend fun updateIncome(income: Income)
+    suspend fun deleteIncomeSeries(groupId: String, fromDate: Long)
+    suspend fun updateIncomeSeries(income: Income)
 }

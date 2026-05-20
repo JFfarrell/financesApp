@@ -28,5 +28,6 @@ data class ExpenseEntity(
     val type: String,
     val date: Long,
     @ColumnInfo(name = "is_recurring") val isRecurring: Boolean,
-    @ColumnInfo(name = "cadence_months") val cadenceMonths: Int
+    @ColumnInfo(name = "cadence_months") val cadenceMonths: Int,
+    @ColumnInfo(name = "recurring_group_id") val recurringGroupId: String? = null
 )

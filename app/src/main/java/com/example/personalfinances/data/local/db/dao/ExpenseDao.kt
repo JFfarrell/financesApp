@@ -48,4 +48,24 @@ interface ExpenseDao {
 
     @Delete
     suspend fun deleteExpense(expense: ExpenseEntity)
+
+    @Query("DELETE FROM expenses WHERE recurring_group_id = :groupId AND date >= :fromDate")
+    suspend fun deleteExpenseSeriesFromDate(groupId: String, fromDate: Long)
+
+    @Query("""
+        UPDATE expenses
+        SET amount = :amount, title = :title, description = :description,
+            type = :type, is_recurring = :isRecurring, cadence_months = :cadenceMonths
+        WHERE recurring_group_id = :groupId AND date >= :fromDate
+    """)
+    suspend fun updateExpenseSeriesFromDate(
+        groupId: String,
+        fromDate: Long,
+        amount: Double,
+        title: String,
+        description: String,
+        type: String,
+        isRecurring: Boolean,
+        cadenceMonths: Int
+    )
 }

@@ -69,16 +69,14 @@ Collapsed Expenses and Income into a redesigned Calendar screen. Entries for any
 
 ---
 
-### 9. Delete Recurring Expense — Scope Dialog
-**Status:** To do
+### 9. Recurring Transaction Series + Scope Dialog
+**Status:** Done
 
-When the user deletes a recurring expense, show a confirmation dialog offering:
-1. **Delete this entry only** — removes just the tapped record.
-2. **Delete all recurring entries** — removes every expense record that shares the same type + cadence group.
+When adding a recurring expense or income, the user is asked "For how many months?" and the app auto-creates entries for each month using a shared `recurringGroupId` (UUID). When deleting or editing a recurring entry, a dialog asks:
+1. **This entry only** — affects only the tapped record.
+2. **This & future** — affects this record and all future entries in the series (same `recurringGroupId`, date ≥ current).
 
-This requires a way to identify "linked" recurring entries (e.g. a shared `recurringGroupId` column, or matching on `type + cadence + isRecurring`).
-
-**Complexity:** Medium — dialog UI, group identification strategy, new DAO delete query.
+Implemented via new DAO bulk-update/delete queries, four new use cases (`DeleteExpenseSeriesUseCase`, `UpdateExpenseSeriesUseCase`, `DeleteIncomeSeriesUseCase`, `UpdateIncomeSeriesUseCase`), `RecurringDialogState` sealed class in CalendarViewModel, and a `RecurringActionDialog` composable in CalendarScreen. `Income` gained an explicit `isRecurring: Boolean` field (matching `Expense`) so both transaction types behave identically. DB version bumped to 6.
 
 ---
 
@@ -90,4 +88,4 @@ Renamed label to "Home" and updated icon to `Icons.Default.Home`.
 ---
 
 ## Suggested Order
-1 ✅ → 3 ✅ → 2 → 7 → 8 → 9 → 4 → 5 → 6 → 10
+1 ✅ → 3 ✅ → 2 → 7 → 8 ✅ → 9 ✅ → 10 ✅ → 4 → 5 → 6

@@ -30,4 +30,20 @@ class IncomeRepositoryImpl @Inject constructor(
     override suspend fun updateIncome(income: Income) {
         dao.updateIncome(income.toEntity())
     }
+
+    override suspend fun deleteIncomeSeries(groupId: String, fromDate: Long) {
+        dao.deleteIncomeSeriesFromDate(groupId, fromDate)
+    }
+
+    override suspend fun updateIncomeSeries(income: Income) {
+        dao.updateIncomeSeriesFromDate(
+            groupId = income.recurringGroupId!!,
+            fromDate = income.startDate,
+            amount = income.amount,
+            type = income.type.name,
+            description = income.description,
+            isRecurring = income.isRecurring,
+            cadenceMonths = income.cadenceMonths
+        )
+    }
 }

@@ -24,6 +24,9 @@ import com.example.personalfinances.util.CurrencyFormatter
 /**
  * A single row in the income list showing type name, description, cadence, and amount.
  *
+ * A repeat icon is shown when [Income.isRecurring] is true. The cadence label is derived from
+ * [Income.cadenceMonths] regardless of the recurring flag, so it reads correctly in both modes.
+ *
  * The displayed description is the user-provided text for [IncomeType.OTHER], or the type's
  * built-in [defaultDescription] for all other types.
  */
@@ -53,7 +56,7 @@ fun IncomeListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(income.type.displayName, style = MaterialTheme.typography.bodyLarge)
-                    if (income.cadenceMonths > 0) {
+                    if (income.isRecurring) {
                         Icon(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = "Recurring",

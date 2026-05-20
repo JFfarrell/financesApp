@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.personalfinances.domain.model.Expense
 import com.example.personalfinances.domain.model.ExpenseCategory
@@ -39,13 +39,13 @@ import com.example.personalfinances.ui.component.HierarchicalTypeField
  * When [initialExpense] is null the sheet is in Add mode; when non-null it pre-populates all
  * fields and switches the title and save button label to "Edit".
  *
- * [defaultDateMillis] is used as the expense date in Add mode only; in Edit mode the original
- * date is preserved.
+ * In Add mode with recurring enabled, a "For how many months?" field is shown; [onSave] receives
+ * the duration so the caller can create the full series. In Edit mode the duration is always 1.
  *
  * @param initialExpense Pre-populated expense for Edit mode, or null for Add mode.
  * @param defaultDateMillis Epoch millis for the first day of the currently selected month.
  * @param onDismiss Called when the sheet is dismissed without saving.
- * @param onSave Called with the completed [Expense] when the user taps Save.
+ * @param onSave Called with the completed [Expense] and the number of months to create.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +53,7 @@ fun AddExpenseBottomSheet(
     initialExpense: Expense? = null,
     defaultDateMillis: Long,
     onDismiss: () -> Unit,
-    onSave: (Expense) -> Unit
+    onSave: (Expense, durationMonths: Int) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
     val isEditMode = initialExpense != null
@@ -67,6 +67,7 @@ fun AddExpenseBottomSheet(
     var cadenceText by remember { mutableStateOf(
         initialExpense?.cadenceMonths?.takeIf { it > 0 }?.toString() ?: "1"
     ) }
+    var durationText by remember { mutableStateOf("1") }
 
     val needsDescription = selectedType?.isDescriptionEditable == true
     val isSaveEnabled = amountText.isNotBlank()
@@ -84,6 +85,7 @@ fun AddExpenseBottomSheet(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
                 .navigationBarsPadding()
+                .imePadding()
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -151,6 +153,15 @@ fun AddExpenseBottomSheet(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (!isEditMode) {
+                    OutlinedTextField(
+                        value = durationText,
+                        onValueChange = { durationText = it },
+                        label = { Text("For how many months?") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -160,6 +171,9 @@ fun AddExpenseBottomSheet(
                     val amount = amountText.toDoubleOrNull() ?: return@Button
                     val type = selectedType ?: return@Button
                     val cadence = if (isRecurring) cadenceText.toIntOrNull() ?: 1 else 0
+                    val duration = if (isRecurring && !isEditMode)
+                        durationText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                    else 1
                     onSave(
                         Expense(
                             id = initialExpense?.id ?: 0,
@@ -169,8 +183,10 @@ fun AddExpenseBottomSheet(
                             type = type,
                             date = initialExpense?.date ?: defaultDateMillis,
                             isRecurring = isRecurring,
-                            cadenceMonths = cadence
-                        )
+                            cadenceMonths = cadence,
+                            recurringGroupId = initialExpense?.recurringGroupId
+                        ),
+                        duration
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),

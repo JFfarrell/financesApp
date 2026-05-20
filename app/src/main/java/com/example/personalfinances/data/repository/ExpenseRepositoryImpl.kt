@@ -39,4 +39,21 @@ class ExpenseRepositoryImpl @Inject constructor(
     override suspend fun updateExpense(expense: Expense) {
         dao.updateExpense(expense.toEntity())
     }
+
+    override suspend fun deleteExpenseSeries(groupId: String, fromDate: Long) {
+        dao.deleteExpenseSeriesFromDate(groupId, fromDate)
+    }
+
+    override suspend fun updateExpenseSeries(expense: Expense) {
+        dao.updateExpenseSeriesFromDate(
+            groupId = expense.recurringGroupId!!,
+            fromDate = expense.date,
+            amount = expense.amount,
+            title = expense.title,
+            description = expense.description,
+            type = expense.type.name,
+            isRecurring = expense.isRecurring,
+            cadenceMonths = expense.cadenceMonths
+        )
+    }
 }

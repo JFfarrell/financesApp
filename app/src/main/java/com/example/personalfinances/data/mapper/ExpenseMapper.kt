@@ -21,7 +21,8 @@ fun ExpenseEntity.toDomain() = Expense(
     type = ExpenseType.valueOf(type),
     date = date,
     isRecurring = isRecurring,
-    cadenceMonths = cadenceMonths
+    cadenceMonths = cadenceMonths,
+    recurringGroupId = recurringGroupId
 )
 
 /** Converts a domain [Expense] to an [ExpenseEntity] ready for database insertion. */
@@ -33,5 +34,6 @@ fun Expense.toEntity() = ExpenseEntity(
     type = type.name,
     date = date,
     isRecurring = isRecurring,
-    cadenceMonths = cadenceMonths
+    cadenceMonths = cadenceMonths,
+    recurringGroupId = recurringGroupId
 )

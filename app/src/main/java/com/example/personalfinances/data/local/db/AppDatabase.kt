@@ -18,6 +18,8 @@ import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
  *  - 3: ExpenseEntity replaced `categoryId` FK with `type: String`; CategoryEntity removed;
  *       SavingsGoalEntity replaced `currentSaved` with `startingAmount`
  *  - 4: ExpenseEntity added `title: String`
+ *  - 5: ExpenseEntity and IncomeEntity added `recurring_group_id: String?`
+ *  - 6: IncomeEntity added `is_recurring: Boolean`
  *
  * [fallbackToDestructiveMigration] is set in [com.example.personalfinances.di.DatabaseModule],
  * so no explicit migration SQL is needed during development — the database is recreated on
@@ -29,7 +31,7 @@ import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
         IncomeEntity::class,
         SavingsGoalEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

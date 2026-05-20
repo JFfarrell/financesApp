@@ -22,4 +22,17 @@ object DateUtils {
 
     fun todayEpochMillis(): Long =
         java.time.LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    /** Returns epoch millis for the first day of the month that is [months] ahead of [fromMillis]. */
+    fun addMonths(fromMillis: Long, months: Int): Long {
+        val zone = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(fromMillis)
+            .atZone(zone)
+            .toLocalDate()
+            .withDayOfMonth(1)
+            .plusMonths(months.toLong())
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+    }
 }

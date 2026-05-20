@@ -29,4 +29,6 @@ interface ExpenseRepository {
     suspend fun addExpense(expense: Expense)
     suspend fun deleteExpense(expense: Expense)
     suspend fun updateExpense(expense: Expense)
+    suspend fun deleteExpenseSeries(groupId: String, fromDate: Long)
+    suspend fun updateExpenseSeries(expense: Expense)
 }

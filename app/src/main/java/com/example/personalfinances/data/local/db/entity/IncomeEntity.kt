@@ -13,6 +13,10 @@ import androidx.room.PrimaryKey
  *
  * [description] is only populated when [type] is "OTHER". For all other types the description
  * is derived from the enum's [defaultDescription] at read time and not stored in the database.
+ *
+ * [isRecurring] and [cadenceMonths] mirror the same fields on [com.example.personalfinances.data.local.db.entity.ExpenseEntity].
+ * [recurringGroupId] is a UUID string shared by all entries in the same recurring series; null
+ * for one-off records.
  */
 @Entity(tableName = "incomes")
 data class IncomeEntity(
@@ -20,6 +24,8 @@ data class IncomeEntity(
     val amount: Double,
     val type: String,
     val description: String?,
+    @ColumnInfo(name = "is_recurring") val isRecurring: Boolean,
     @ColumnInfo(name = "cadence_months") val cadenceMonths: Int,
-    @ColumnInfo(name = "start_date") val startDate: Long
+    @ColumnInfo(name = "start_date") val startDate: Long,
+    @ColumnInfo(name = "recurring_group_id") val recurringGroupId: String? = null
 )

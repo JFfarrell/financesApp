@@ -30,4 +30,23 @@ interface IncomeDao {
 
     @Delete
     suspend fun deleteIncome(income: IncomeEntity)
+
+    @Query("DELETE FROM incomes WHERE recurring_group_id = :groupId AND start_date >= :fromDate")
+    suspend fun deleteIncomeSeriesFromDate(groupId: String, fromDate: Long)
+
+    @Query("""
+        UPDATE incomes
+        SET amount = :amount, type = :type, description = :description,
+            is_recurring = :isRecurring, cadence_months = :cadenceMonths
+        WHERE recurring_group_id = :groupId AND start_date >= :fromDate
+    """)
+    suspend fun updateIncomeSeriesFromDate(
+        groupId: String,
+        fromDate: Long,
+        amount: Double,
+        type: String,
+        description: String?,
+        isRecurring: Boolean,
+        cadenceMonths: Int
+    )
 }

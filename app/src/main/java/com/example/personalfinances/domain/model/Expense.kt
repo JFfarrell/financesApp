@@ -21,5 +21,6 @@ data class Expense(
     val type: ExpenseType,
     val date: Long,
     val isRecurring: Boolean,
-    val cadenceMonths: Int
+    val cadenceMonths: Int,
+    val recurringGroupId: String? = null
 )

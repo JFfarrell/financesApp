@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -22,6 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -31,8 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.personalfinances.domain.model.Expense
-import com.example.personalfinances.domain.model.Income
 import com.example.personalfinances.ui.component.ExpenseListItem
 import com.example.personalfinances.ui.component.IncomeListItem
 import com.example.personalfinances.ui.component.MonthSelector
@@ -150,9 +150,9 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             initialExpense = uiState.expenseSheetTarget,
             defaultDateMillis = defaultDateMillis,
             onDismiss = { viewModel.onEvent(CalendarEvent.HideExpenseSheet) },
-            onSave = { expense ->
+            onSave = { expense, durationMonths ->
                 val event = if (uiState.expenseSheetTarget == null)
-                    CalendarEvent.AddExpense(expense)
+                    CalendarEvent.AddExpense(expense, durationMonths)
                 else
                     CalendarEvent.UpdateExpense(expense)
                 viewModel.onEvent(event)
@@ -165,15 +165,79 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             initialIncome = uiState.incomeSheetTarget,
             defaultDateMillis = defaultDateMillis,
             onDismiss = { viewModel.onEvent(CalendarEvent.HideIncomeSheet) },
-            onSave = { income ->
+            onSave = { income, durationMonths ->
                 val event = if (uiState.incomeSheetTarget == null)
-                    CalendarEvent.AddIncome(income)
+                    CalendarEvent.AddIncome(income, durationMonths)
                 else
                     CalendarEvent.UpdateIncome(income)
                 viewModel.onEvent(event)
             }
         )
     }
+
+    when (val dialog = uiState.recurringDialog) {
+        is RecurringDialogState.PendingDeleteExpense ->
+            RecurringActionDialog(
+                title = "Delete recurring expense",
+                onConfirm = { scope ->
+                    viewModel.onEvent(CalendarEvent.ConfirmDeleteExpense(dialog.expense, scope))
+                },
+                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
+            )
+        is RecurringDialogState.PendingDeleteIncome ->
+            RecurringActionDialog(
+                title = "Delete recurring income",
+                onConfirm = { scope ->
+                    viewModel.onEvent(CalendarEvent.ConfirmDeleteIncome(dialog.income, scope))
+                },
+                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
+            )
+        is RecurringDialogState.PendingUpdateExpense ->
+            RecurringActionDialog(
+                title = "Edit recurring expense",
+                onConfirm = { scope ->
+                    viewModel.onEvent(CalendarEvent.ConfirmUpdateExpense(dialog.updated, scope))
+                },
+                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
+            )
+        is RecurringDialogState.PendingUpdateIncome ->
+            RecurringActionDialog(
+                title = "Edit recurring income",
+                onConfirm = { scope ->
+                    viewModel.onEvent(CalendarEvent.ConfirmUpdateIncome(dialog.updated, scope))
+                },
+                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
+            )
+        RecurringDialogState.None -> Unit
+    }
+}
+
+/**
+ * Dialog shown when the user tries to delete or edit a recurring transaction.
+ * The user must choose whether the change applies to this entry only or to this
+ * and all future entries in the series.
+ */
+@Composable
+private fun RecurringActionDialog(
+    title: String,
+    onConfirm: (RecurringScope) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text("Apply this change to just this entry, or to this and all future entries in the series?") },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(RecurringScope.THIS_AND_FUTURE) }) {
+                Text("This & future")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onConfirm(RecurringScope.THIS_ONLY) }) {
+                Text("This only")
+            }
+        }
+    )
 }
 
 @Composable
@@ -195,6 +259,11 @@ private fun SubSectionHeader(title: String) {
     )
 }
 
+/**
+ * Wraps [content] in a swipe-to-dismiss gesture. Swiping left reveals a red delete background
+ * and calls [onDelete]; the item then snaps back (confirmValueChange returns false) so the UI
+ * remains stable while the ViewModel decides whether to delete immediately or show a dialog.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDeleteBox(
@@ -205,8 +274,8 @@ private fun SwipeToDeleteBox(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
                 onDelete()
-                true
-            } else false
+            }
+            false
         }
     )
     SwipeToDismissBox(

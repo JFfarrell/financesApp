@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -30,6 +32,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+/**
+ * Full-screen authentication gate shown before the main app.
+ *
+ * This screen has no [Scaffold], so it must manage window insets itself. [systemBarsPadding]
+ * keeps content away from the status and navigation bars; [imePadding] shrinks the available
+ * area when the keyboard is open so the centred form stays fully visible without the user
+ * having to manually dismiss the keyboard.
+ */
 @Composable
 fun LoginScreen(
     onAuthenticated: () -> Unit,
@@ -43,7 +53,13 @@ fun LoginScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding(),
+        contentAlignment = Alignment.Center
+    ) {
         when (uiState) {
             is LoginViewModel.UiState.Loading -> CircularProgressIndicator()
             else -> LoginForm(
