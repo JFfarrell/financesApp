@@ -85,5 +85,86 @@ Renamed label to "Home" and updated icon to `Icons.Default.Home`.
 
 ---
 
+---
+
+### 11. Unified Transaction Data Model Refactor
+**Status:** In progress
+
+Replace the rigid two-entity model (Expense + Income with hardcoded enums) with a unified `Transaction` model. Categories and merchants become user-defined entities. Tags replace the enum hierarchy for flexible analytics.
+
+See memory for full agreed data model spec.
+
+#### Layer 1 — Domain models & data layer
+- [x] `TransactionType` enum (EXPENSE, INCOME, SAVING)
+- [x] `CadenceUnit` enum (DAYS, WEEKS, MONTHS, YEARS)
+- [x] `Category` domain model
+- [x] `Merchant` domain model
+- [x] `Transaction` domain model
+- [x] `TransactionEntity`, `CategoryEntity`, `MerchantEntity`
+- [ ] `TransactionDao`, `CategoryDao`, `MerchantDao`
+- [ ] `TransactionMapper`, `CategoryMapper`, `MerchantMapper`
+- [ ] Register new entities in `AppDatabase`, bump DB version
+
+#### Layer 2 — Repository & use cases
+- [ ] `TransactionRepository` interface + implementation (replaces `ExpenseRepository` + `IncomeRepository`)
+- [ ] `GetTransactionsByMonthUseCase`
+- [ ] `AddTransactionUseCase`
+- [ ] `UpdateTransactionUseCase`
+- [ ] `DeleteTransactionUseCase`
+- [ ] `DeleteTransactionSeriesUseCase`
+- [ ] `UpdateTransactionSeriesUseCase`
+- [ ] `GetSavingsTotalUseCase` (rewritten to filter by `transactionType == SAVING`)
+
+#### Layer 3 — ViewModels
+- [ ] `DashboardViewModel` — rewrite analytics to group by `category.name` instead of `ExpenseType.displayName`
+- [ ] `CalendarViewModel` — migrate from `Expense`/`Income` to `Transaction`
+- [ ] `SavingsViewModel` — update to use new savings use case
+
+#### Layer 4 — UI
+- [ ] Remove `HierarchicalTypeField` component
+- [ ] New single category picker (searchable, create-new inline)
+- [ ] Tag input UI (add/remove tags, searchable existing tags)
+- [ ] Merchant input (searchable, create-new inline)
+- [ ] Unified `TransactionListItem` replacing `ExpenseListItem` + `IncomeListItem`
+- [ ] `AddTransactionBottomSheet` replacing `AddExpenseBottomSheet` + `AddIncomeBottomSheet`
+
+#### Cleanup (after all layers done)
+- [ ] Delete legacy files: `Expense`, `Income`, `ExpenseType`, `ExpenseCategory`, `IncomeType`, `LegacyTransactionType`
+- [ ] Delete legacy entities, DAOs, mappers
+
+---
+
+### 12. Date Range Utilities & Transaction History Metadata
+**Status:** To do
+
+Repository-layer helpers for working with date ranges and transaction history bounds. Useful for analytics screens, date range pickers, and understanding the full span of a user's data.
+
+- `getByDateRange(start, end)` — repository wrapper around `TransactionDao.getByMonth` with a clearer name
+- `getByTag(tag, start?, end?)` — repository-layer Kotlin filter on top of `getAll()` or `getByDateRange()`
+- `getFirstTransactionDate()` — date of the user's earliest transaction (`SELECT MIN(date) FROM transactions`)
+- `getLastTransactionDate()` — date of the user's most recent transaction (`SELECT MAX(date) FROM transactions`)
+
+**Complexity:** Low — mostly thin wrappers and two simple DAO queries. Best done as part of item 11 Layer 2.
+
+---
+
+### 13. Review Series Update Cadence Behaviour
+**Status:** To do
+
+When `updateTransactionSeriesFromDate` is called, it currently updates `cadence_unit` and `cadence_value` across all future instances in the series. Consider whether changing the cadence mid-series is a valid user action, and if so whether it should apply to all future instances or only from the edited entry onwards. May require a separate DAO query or UI confirmation dialog.
+
+**Complexity:** Low-Medium — design decision first, then a small DAO/use case change.
+
+---
+
+### 14. Tag-based Analytics
+**Status:** To do
+
+Filter and group transactions by tag for analytics screens. Requires `getByTag` query on `TransactionDao`. Initial implementation using SQL `LIKE` on serialised JSON tags field. Known limitation: fragile for partial tag name matches. Future improvement: junction table for reliable multi-tag AND/OR filtering.
+
+**Complexity:** Medium — query complexity depends on whether junction table refactor is done first. Best tackled after item 11 is complete.
+
+---
+
 ## Suggested Order
-1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 2 → 4 → 5
+1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 11 (in progress) → 2 → 12 → 4 → 5

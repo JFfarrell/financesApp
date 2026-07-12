@@ -1,0 +1,87 @@
+package com.example.personalfinances.data.local.db.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import com.example.personalfinances.data.local.db.entity.TransactionEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface TransactionDao {
+    @Query("SELECT * FROM transactions")
+    fun getAll() : Flow<List<TransactionEntity>>
+
+    @Query("SELECT MIN(date) FROM transactions")
+    fun getFirstTransactionDate(): Flow<Long?>
+
+    @Query("SELECT MAX(date) FROM transactions")
+    fun getLastTransactionDate(): Flow<Long?>
+
+    @Query("SELECT * FROM transactions WHERE id = :transactionId")
+    fun getById(transactionId: String) : Flow<TransactionEntity?>
+
+    @Query("SELECT * FROM transactions WHERE date BETWEEN :start AND :end")
+    fun getByDateRange(start: Long, end: Long): Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions WHERE merchant_id = :merchantId")
+    fun getByMerchant(merchantId: String) : Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions WHERE category_id = :categoryId")
+    fun getByCategory(categoryId: String) : Flow<List<TransactionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTransaction(transaction: TransactionEntity)
+
+    @Update
+    suspend fun updateTransaction(transaction: TransactionEntity)
+
+    @Delete
+    suspend fun deleteTransaction(transaction: TransactionEntity)
+
+    @Query("""SELECT COALESCE(SUM(amount), 0.0) 
+            FROM transactions 
+            WHERE merchant_id = :merchantId
+            AND (:transactionType IS NULL OR :transactionType = transaction_type)
+            """)
+    fun getTotalByMerchant(merchantId: String, transactionType: String?) : Flow<Double>
+
+    @Query("""SELECT COALESCE(SUM(amount), 0.0) 
+            FROM transactions
+            WHERE category_id = :categoryId 
+            AND (:transactionType IS NULL OR :transactionType = transaction_type)
+            """)
+    fun getTotalByCategory(categoryId: String, transactionType: String?) : Flow<Double>
+
+    @Query("DELETE FROM transactions WHERE recurring_group_id = :groupId AND date >= :fromDate")
+    suspend fun deleteTransactionSeriesFromDate(groupId: String, fromDate: Long)
+
+    @Query("""
+        UPDATE transactions
+        SET transaction_type = :transactionType, 
+            amount = :amount,
+            cadence_unit = :cadenceUnit,
+            cadence_value = :cadenceValue,
+            category_id = :categoryId,
+            merchant_id = :merchantId,
+            is_recurring = :isRecurring,
+            notes = :notes,
+            tags = :tags
+        WHERE recurring_group_id = :groupId AND date >= :fromDate
+    """)
+    suspend fun updateTransactionSeriesFromDate(
+        transactionType: String,
+        groupId: String,
+        fromDate: Long,
+        amount: Double,
+        cadenceUnit: String,
+        cadenceValue: Int,
+        categoryId: String,
+        merchantId: String?,
+        isRecurring: Boolean,
+        notes: String?,
+        tags: String
+    )
+}
