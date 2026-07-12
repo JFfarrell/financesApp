@@ -47,18 +47,16 @@ Backfill KDoc docstrings across all pre-existing files (entities, DAOs, mappers,
 ---
 
 ### 6. App Icon
-**Status:** To do
+**Status:** Done
 
-Update the default launcher icon to a custom design.
+Replaced the default launcher icon with a custom design.
 
 ---
 
 ### 7. Auto-set Recurring When Savings Type Selected
-**Status:** To do
+**Status:** Dropped
 
-In `AddExpenseBottomSheet`, when the user selects any `SAVINGS_*` type, automatically set the recurring toggle to `true`. The user can still override it manually. This reduces friction since savings contributions are almost always recurring.
-
-**Complexity:** Small — a `LaunchedEffect` or `onTypeSelected` side-effect in the bottom sheet.
+Superseded by the explicit recurring toggle introduced in item 9. Users set the toggle themselves; auto-setting it adds complexity for marginal gain.
 
 ---
 
@@ -88,4 +86,4 @@ Renamed label to "Home" and updated icon to `Icons.Default.Home`.
 ---
 
 ## Suggested Order
-1 ✅ → 3 ✅ → 2 → 7 → 8 ✅ → 9 ✅ → 10 ✅ → 4 → 5 → 6
+1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 2 → 4 → 5

@@ -1,6 +1,6 @@
 package com.example.personalfinances.data.mapper
 
-import com.example.personalfinances.data.local.db.entity.IncomeEntity
+import com.example.personalfinances.data.local.db.entity.legacy.IncomeEntity
 import com.example.personalfinances.domain.model.Income
 import com.example.personalfinances.domain.model.IncomeType
 

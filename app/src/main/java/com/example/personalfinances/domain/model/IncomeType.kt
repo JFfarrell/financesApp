@@ -3,7 +3,7 @@ package com.example.personalfinances.domain.model
 /**
  * Fixed set of income types a user can assign to an [Income] entry.
  *
- * Each entry implements [TransactionType], providing a display name and a default description
+ * Each entry implements [LegacyTransactionType], providing a display name and a default description
  * that is shown read-only in the UI. [OTHER] is the sole exception: its description is blank
  * and editable, allowing the user to describe an income source that doesn't fit the other types.
  *
@@ -14,7 +14,7 @@ enum class IncomeType(
     override val displayName: String,
     override val defaultDescription: String,
     override val isDescriptionEditable: Boolean = false
-) : TransactionType {
+) : LegacyTransactionType {
 
     SALARY(
         displayName = "Salary",

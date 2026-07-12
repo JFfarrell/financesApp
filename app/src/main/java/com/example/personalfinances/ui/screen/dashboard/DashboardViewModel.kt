@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.personalfinances.domain.usecase.expense.GetExpensesByMonthUseCase
 import com.example.personalfinances.domain.usecase.income.GetIncomesUseCase
+import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
+import com.example.personalfinances.domain.usecase.settings.SetPayCycleStartDayUseCase
 import com.example.personalfinances.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -11,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.YearMonth
@@ -26,7 +30,9 @@ import javax.inject.Inject
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getExpensesByMonthUseCase: GetExpensesByMonthUseCase,
-    private val getIncomesUseCase: GetIncomesUseCase
+    private val getIncomesUseCase: GetIncomesUseCase,
+    private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase,
+    private val setPayCycleStartDayUseCase: SetPayCycleStartDayUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -35,14 +41,18 @@ class DashboardViewModel @Inject constructor(
     private var monthJob: Job? = null
 
     init {
-        loadMonth(YearMonth.now())
+        getPayCycleStartDayUseCase().onEach { startDay ->
+            _uiState.update { it.copy(payCycleStartDay = startDay) }
+            loadMonth(_uiState.value.selectedMonth)
+        }.launchIn(viewModelScope)
     }
 
     private fun loadMonth(month: YearMonth) {
+        val startDay = _uiState.value.payCycleStartDay
         monthJob?.cancel()
         _uiState.update { it.copy(isLoading = true, selectedMonth = month) }
         monthJob = viewModelScope.launch {
-            val (start, end) = DateUtils.monthBounds(month)
+            val (start, end) = DateUtils.monthBounds(month, startDay)
             combine(
                 getExpensesByMonthUseCase(start, end),
                 getIncomesUseCase(start, end)
@@ -69,11 +79,19 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /** Processes a navigation event from the Dashboard screen. */
+    /** Processes a user action from the Dashboard screen. */
     fun onEvent(event: DashboardEvent) {
         when (event) {
             DashboardEvent.PreviousMonth -> loadMonth(_uiState.value.selectedMonth.minusMonths(1))
             DashboardEvent.NextMonth -> loadMonth(_uiState.value.selectedMonth.plusMonths(1))
+            DashboardEvent.ShowSettingsSheet ->
+                _uiState.update { it.copy(isSettingsSheetOpen = true) }
+            DashboardEvent.HideSettingsSheet ->
+                _uiState.update { it.copy(isSettingsSheetOpen = false) }
+            is DashboardEvent.SetPayCycleStartDay -> viewModelScope.launch {
+                setPayCycleStartDayUseCase(event.day)
+                _uiState.update { it.copy(isSettingsSheetOpen = false) }
+            }
         }
     }
 }
@@ -86,17 +104,22 @@ class DashboardViewModel @Inject constructor(
  */
 data class DashboardUiState(
     val selectedMonth: YearMonth = YearMonth.now(),
+    val payCycleStartDay: Int = 1,
     val totalIncome: Double = 0.0,
     val totalExpenses: Double = 0.0,
     val remainder: Double = 0.0,
     val expensesByCategory: Map<String, Double> = emptyMap(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isSettingsSheetOpen: Boolean = false
 )
 
 /**
- * Navigation events for the Dashboard screen.
+ * User actions on the Dashboard screen.
  */
 sealed class DashboardEvent {
     object PreviousMonth : DashboardEvent()
     object NextMonth : DashboardEvent()
+    object ShowSettingsSheet : DashboardEvent()
+    object HideSettingsSheet : DashboardEvent()
+    data class SetPayCycleStartDay(val day: Int) : DashboardEvent()
 }

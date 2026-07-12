@@ -5,9 +5,9 @@ import androidx.room.RoomDatabase
 import com.example.personalfinances.data.local.db.dao.ExpenseDao
 import com.example.personalfinances.data.local.db.dao.IncomeDao
 import com.example.personalfinances.data.local.db.dao.SavingsGoalDao
-import com.example.personalfinances.data.local.db.entity.ExpenseEntity
-import com.example.personalfinances.data.local.db.entity.IncomeEntity
-import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
+import com.example.personalfinances.data.local.db.entity.legacy.ExpenseEntity
+import com.example.personalfinances.data.local.db.entity.legacy.IncomeEntity
+import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntity
 
 /**
  * Root Room database for the app.

@@ -1,4 +1,4 @@
-package com.example.personalfinances.data.local.db.entity
+package com.example.personalfinances.data.local.db.entity.legacy
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -14,7 +14,7 @@ import androidx.room.PrimaryKey
  * [description] is only populated when [type] is "OTHER". For all other types the description
  * is derived from the enum's [defaultDescription] at read time and not stored in the database.
  *
- * [isRecurring] and [cadenceMonths] mirror the same fields on [com.example.personalfinances.data.local.db.entity.ExpenseEntity].
+ * [isRecurring] and [cadenceMonths] mirror the same fields on [ExpenseEntity].
  * [recurringGroupId] is a UUID string shared by all entries in the same recurring series; null
  * for one-off records.
  */

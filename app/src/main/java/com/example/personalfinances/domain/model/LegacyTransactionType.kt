@@ -8,7 +8,7 @@ package com.example.personalfinances.domain.model
  * the type means. The special "Other" entry in each enum sets [isDescriptionEditable] to true,
  * allowing the user to provide their own description at entry time.
  */
-interface TransactionType {
+interface LegacyTransactionType {
 
     /** Human-readable label shown in dropdowns and list items (e.g. "Stock / RSU"). */
     val displayName: String

@@ -13,11 +13,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +36,10 @@ import com.example.personalfinances.domain.model.Expense
 import com.example.personalfinances.domain.model.ExpenseCategory
 import com.example.personalfinances.domain.model.ExpenseType
 import com.example.personalfinances.ui.component.HierarchicalTypeField
+import com.example.personalfinances.util.DateUtils.fromUtcMidnight
+import com.example.personalfinances.util.DateUtils.toLocalDate
+import com.example.personalfinances.util.DateUtils.toUtcMidnight
+import java.time.format.DateTimeFormatter
 
 /**
  * Modal bottom sheet for adding or editing an expense entry.
@@ -68,12 +76,33 @@ fun AddExpenseBottomSheet(
         initialExpense?.cadenceMonths?.takeIf { it > 0 }?.toString() ?: "1"
     ) }
     var durationText by remember { mutableStateOf("1") }
+    var selectedDateMillis by remember { mutableStateOf(initialExpense?.date ?: defaultDateMillis) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis.toUtcMidnight())
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy") }
 
     val needsDescription = selectedType?.isDescriptionEditable == true
     val isSaveEnabled = amountText.isNotBlank()
         && title.isNotBlank()
         && selectedType != null
         && (!needsDescription || description.isNotBlank())
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedDateMillis = it.fromUtcMidnight() }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -108,6 +137,17 @@ fun AddExpenseBottomSheet(
                 label = { Text("Title") },
                 placeholder = { Text("e.g. Tesco, Monthly gym, Shell") },
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = selectedDateMillis.toLocalDate().format(dateFormatter),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Date") },
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    TextButton(onClick = { showDatePicker = true }) { Text("Change") }
+                }
             )
 
             HierarchicalTypeField(
@@ -181,7 +221,7 @@ fun AddExpenseBottomSheet(
                             title = title,
                             description = description,
                             type = type,
-                            date = initialExpense?.date ?: defaultDateMillis,
+                            date = selectedDateMillis,
                             isRecurring = isRecurring,
                             cadenceMonths = cadence,
                             recurringGroupId = initialExpense?.recurringGroupId

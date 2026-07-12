@@ -45,7 +45,7 @@ import com.example.personalfinances.util.DateUtils
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val defaultDateMillis = DateUtils.monthBounds(uiState.selectedMonth).first
+    val defaultDateMillis = DateUtils.monthBounds(uiState.selectedMonth, uiState.payCycleStartDay).first
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Calendar") }) }

@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.personalfinances.domain.model.TransactionType
+import com.example.personalfinances.domain.model.LegacyTransactionType
 
 /**
  * A two-step type picker for hierarchical transaction types.
@@ -27,7 +27,7 @@ import com.example.personalfinances.domain.model.TransactionType
  *
  * Step 2 — Subtype dropdown: only appears after a category is chosen. Populated with
  * [subtypesForCategory](selectedCategory), which should return only the subtypes that belong
- * to that category. Once a subtype is selected, its [TransactionType.defaultDescription] is
+ * to that category. Once a subtype is selected, its [LegacyTransactionType.defaultDescription] is
  * shown below the dropdown as read-only helper text (empty for `*_OTHER` types).
  *
  * This composable is stateless — the caller owns [selectedCategory] and [selectedType]. Any
@@ -35,7 +35,7 @@ import com.example.personalfinances.domain.model.TransactionType
  * a separate field below this composable.
  *
  * @param C The category enum type (e.g. [com.example.personalfinances.domain.model.ExpenseCategory]).
- * @param T The subtype enum type implementing [TransactionType].
+ * @param T The subtype enum type implementing [LegacyTransactionType].
  * @param categories All available top-level categories.
  * @param categoryDisplayName Extracts the display label from a category value.
  * @param subtypesForCategory Returns the list of subtypes that belong to a given category.
@@ -48,7 +48,7 @@ import com.example.personalfinances.domain.model.TransactionType
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun <C, T : TransactionType> HierarchicalTypeField(
+fun <C, T : LegacyTransactionType> HierarchicalTypeField(
     categories: List<C>,
     categoryDisplayName: (C) -> String,
     subtypesForCategory: (C) -> List<T>,

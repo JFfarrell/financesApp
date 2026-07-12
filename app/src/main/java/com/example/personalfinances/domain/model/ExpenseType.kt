@@ -3,7 +3,7 @@ package com.example.personalfinances.domain.model
 /**
  * Full set of predefined expense subtypes, organised under a parent [ExpenseCategory].
  *
- * Each entry implements [TransactionType], providing a [displayName] and [defaultDescription]
+ * Each entry implements [LegacyTransactionType], providing a [displayName] and [defaultDescription]
  * shown in the UI. Entries ending in `_OTHER` have [isDescriptionEditable] set to true,
  * meaning the user must supply their own description when selecting that subtype.
  *
@@ -18,7 +18,7 @@ enum class ExpenseType(
     override val displayName: String,
     override val defaultDescription: String,
     override val isDescriptionEditable: Boolean = false
-) : TransactionType {
+) : LegacyTransactionType {
 
     // Housing
     HOUSING_RENT_MORTGAGE(

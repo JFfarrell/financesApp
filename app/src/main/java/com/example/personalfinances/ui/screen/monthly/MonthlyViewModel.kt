@@ -16,6 +16,7 @@ import com.example.personalfinances.domain.usecase.income.DeleteIncomeUseCase
 import com.example.personalfinances.domain.usecase.income.GetIncomesUseCase
 import com.example.personalfinances.domain.usecase.income.UpdateIncomeSeriesUseCase
 import com.example.personalfinances.domain.usecase.income.UpdateIncomeUseCase
+import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -28,6 +29,8 @@ import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 enum class RecurringScope { THIS_ONLY, THIS_AND_FUTURE }
 
@@ -50,6 +53,7 @@ sealed class RecurringDialogState {
  */
 data class CalendarUiState(
     val selectedMonth: YearMonth = YearMonth.now(),
+    val payCycleStartDay: Int = 1,
     val expenses: List<Expense> = emptyList(),
     val recurringExpenses: List<Expense> = emptyList(),
     val incomes: List<Income> = emptyList(),
@@ -110,7 +114,8 @@ class CalendarViewModel @Inject constructor(
     private val updateIncomeUseCase: UpdateIncomeUseCase,
     private val updateIncomeSeriesUseCase: UpdateIncomeSeriesUseCase,
     private val deleteIncomeUseCase: DeleteIncomeUseCase,
-    private val deleteIncomeSeriesUseCase: DeleteIncomeSeriesUseCase
+    private val deleteIncomeSeriesUseCase: DeleteIncomeSeriesUseCase,
+    private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -119,14 +124,18 @@ class CalendarViewModel @Inject constructor(
     private var monthJob: Job? = null
 
     init {
-        loadMonth(YearMonth.now())
+        getPayCycleStartDayUseCase().onEach { startDay ->
+            _uiState.update { it.copy(payCycleStartDay = startDay) }
+            loadMonth(_uiState.value.selectedMonth)
+        }.launchIn(viewModelScope)
     }
 
     private fun loadMonth(month: YearMonth) {
+        val startDay = _uiState.value.payCycleStartDay
         monthJob?.cancel()
         _uiState.update { it.copy(isLoading = true, selectedMonth = month) }
         monthJob = viewModelScope.launch {
-            val (start, end) = DateUtils.monthBounds(month)
+            val (start, end) = DateUtils.monthBounds(month, startDay)
             combine(
                 getExpensesByMonthUseCase(start, end),
                 getIncomesUseCase(start, end)

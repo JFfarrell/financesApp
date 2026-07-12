@@ -17,16 +17,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.personalfinances.domain.model.TransactionType
+import com.example.personalfinances.domain.model.LegacyTransactionType
 
 /**
  * A reusable form field combining a type dropdown with a context-sensitive description area.
  *
- * For types where [TransactionType.isDescriptionEditable] is false, a read-only helper text is
- * shown beneath the dropdown displaying [TransactionType.defaultDescription]. This gives the user
+ * For types where [LegacyTransactionType.isDescriptionEditable] is false, a read-only helper text is
+ * shown beneath the dropdown displaying [LegacyTransactionType.defaultDescription]. This gives the user
  * context about what the type means without allowing edits.
  *
- * For types where [TransactionType.isDescriptionEditable] is true (i.e. "Other"), an editable
+ * For types where [LegacyTransactionType.isDescriptionEditable] is true (i.e. "Other"), an editable
  * [OutlinedTextField] is shown instead, and [onDescriptionChange] is called as the user types.
  *
  * This composable is stateless — the caller owns [selectedType] and [description].
@@ -40,7 +40,7 @@ import com.example.personalfinances.domain.model.TransactionType
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun <T : TransactionType> TransactionTypeField(
+fun <T : LegacyTransactionType> TransactionTypeField(
     types: List<T>,
     selectedType: T?,
     onTypeSelected: (T) -> Unit,

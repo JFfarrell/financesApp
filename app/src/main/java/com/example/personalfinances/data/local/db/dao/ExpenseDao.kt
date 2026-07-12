@@ -6,7 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import com.example.personalfinances.data.local.db.entity.ExpenseEntity
+import com.example.personalfinances.data.local.db.entity.legacy.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
