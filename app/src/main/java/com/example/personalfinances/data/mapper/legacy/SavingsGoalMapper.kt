@@ -1,4 +1,4 @@
-package com.example.personalfinances.data.mapper
+package com.example.personalfinances.data.mapper.legacy
 
 import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntity
 import com.example.personalfinances.domain.model.SavingsGoal

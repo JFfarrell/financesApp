@@ -2,9 +2,15 @@ package com.example.personalfinances.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.example.personalfinances.data.local.db.dao.CategoryDao
 import com.example.personalfinances.data.local.db.dao.ExpenseDao
 import com.example.personalfinances.data.local.db.dao.IncomeDao
+import com.example.personalfinances.data.local.db.dao.MerchantDao
 import com.example.personalfinances.data.local.db.dao.SavingsGoalDao
+import com.example.personalfinances.data.local.db.dao.TransactionDao
+import com.example.personalfinances.data.local.db.entity.CategoryEntity
+import com.example.personalfinances.data.local.db.entity.MerchantEntity
+import com.example.personalfinances.data.local.db.entity.TransactionEntity
 import com.example.personalfinances.data.local.db.entity.legacy.ExpenseEntity
 import com.example.personalfinances.data.local.db.entity.legacy.IncomeEntity
 import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntity
@@ -29,13 +35,19 @@ import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntit
     entities = [
         ExpenseEntity::class,
         IncomeEntity::class,
-        SavingsGoalEntity::class
+        SavingsGoalEntity::class,
+        CategoryEntity::class,
+        MerchantEntity::class,
+        TransactionEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun incomeDao(): IncomeDao
     abstract fun savingsGoalDao(): SavingsGoalDao
+    abstract fun transactionDao(): TransactionDao
+    abstract fun merchantDao(): MerchantDao
+    abstract fun categoryDao(): CategoryDao
 }

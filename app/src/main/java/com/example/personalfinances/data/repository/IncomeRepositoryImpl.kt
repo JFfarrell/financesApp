@@ -1,8 +1,8 @@
 package com.example.personalfinances.data.repository
 
 import com.example.personalfinances.data.local.db.dao.IncomeDao
-import com.example.personalfinances.data.mapper.toDomain
-import com.example.personalfinances.data.mapper.toEntity
+import com.example.personalfinances.data.mapper.legacy.toDomain
+import com.example.personalfinances.data.mapper.legacy.toEntity
 import com.example.personalfinances.domain.model.Income
 import com.example.personalfinances.domain.repository.IncomeRepository
 import kotlinx.coroutines.flow.Flow
