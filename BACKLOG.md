@@ -101,19 +101,19 @@ See memory for full agreed data model spec.
 - [x] `Merchant` domain model
 - [x] `Transaction` domain model
 - [x] `TransactionEntity`, `CategoryEntity`, `MerchantEntity`
-- [ ] `TransactionDao`, `CategoryDao`, `MerchantDao`
-- [ ] `TransactionMapper`, `CategoryMapper`, `MerchantMapper`
-- [ ] Register new entities in `AppDatabase`, bump DB version
+- [x] `TransactionDao`, `CategoryDao`, `MerchantDao`
+- [x] `TransactionMapper`, `CategoryMapper`, `MerchantMapper`
+- [x] Register new entities in `AppDatabase`, bump DB version
 
 #### Layer 2 — Repository & use cases
-- [ ] `TransactionRepository` interface + implementation (replaces `ExpenseRepository` + `IncomeRepository`)
-- [ ] `GetTransactionsByMonthUseCase`
-- [ ] `AddTransactionUseCase`
-- [ ] `UpdateTransactionUseCase`
-- [ ] `DeleteTransactionUseCase`
-- [ ] `DeleteTransactionSeriesUseCase`
-- [ ] `UpdateTransactionSeriesUseCase`
-- [ ] `GetSavingsTotalUseCase` (rewritten to filter by `transactionType == SAVING`)
+- [x] `TransactionRepository` interface + implementation (replaces `ExpenseRepository` + `IncomeRepository`)
+- [x] `GetTransactionsByMonthUseCase`
+- [x] `AddTransactionUseCase`
+- [x] `UpdateTransactionUseCase`
+- [x] `DeleteTransactionUseCase`
+- [x] `DeleteTransactionSeriesUseCase`
+- [x] `UpdateTransactionSeriesUseCase`
+- [x] `GetSavingsTotalUseCase` (rewritten to filter by `transactionType == SAVING`)
 
 #### Layer 3 — ViewModels
 - [ ] `DashboardViewModel` — rewrite analytics to group by `category.name` instead of `ExpenseType.displayName`

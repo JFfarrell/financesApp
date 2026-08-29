@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.personalfinances.data.local.db.entity.TransactionEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 @Dao
 interface TransactionDao {
@@ -15,16 +16,16 @@ interface TransactionDao {
     fun getAll() : Flow<List<TransactionEntity>>
 
     @Query("SELECT MIN(date) FROM transactions")
-    fun getFirstTransactionDate(): Flow<Long?>
+    fun getFirstTransactionDate(): Flow<LocalDate?>
 
     @Query("SELECT MAX(date) FROM transactions")
-    fun getLastTransactionDate(): Flow<Long?>
+    fun getLastTransactionDate(): Flow<LocalDate?>
 
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getById(transactionId: String) : Flow<TransactionEntity?>
 
     @Query("SELECT * FROM transactions WHERE date BETWEEN :start AND :end")
-    fun getByDateRange(start: Long, end: Long): Flow<List<TransactionEntity>>
+    fun getByDateRange(start: LocalDate, end: LocalDate): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE merchant_id = :merchantId")
     fun getByMerchant(merchantId: String) : Flow<List<TransactionEntity>>
@@ -48,6 +49,12 @@ interface TransactionDao {
             """)
     fun getTotalByMerchant(merchantId: String, transactionType: String?) : Flow<Double>
 
+    @Query("""SELECT COALESCE(SUM(amount), 0.0)
+            FROM transactions
+            WHERE transaction_type = :transactionType AND date <= :upToDate
+            """)
+    fun getTotalByType(transactionType: String, upToDate: LocalDate) : Flow<Double>
+
     @Query("""SELECT COALESCE(SUM(amount), 0.0) 
             FROM transactions
             WHERE category_id = :categoryId 
@@ -56,7 +63,7 @@ interface TransactionDao {
     fun getTotalByCategory(categoryId: String, transactionType: String?) : Flow<Double>
 
     @Query("DELETE FROM transactions WHERE recurring_group_id = :groupId AND date >= :fromDate")
-    suspend fun deleteTransactionSeriesFromDate(groupId: String, fromDate: Long)
+    suspend fun deleteTransactionSeriesFromDate(groupId: String, fromDate: LocalDate)
 
     @Query("""
         UPDATE transactions
@@ -74,7 +81,7 @@ interface TransactionDao {
     suspend fun updateTransactionSeriesFromDate(
         transactionType: String,
         groupId: String,
-        fromDate: Long,
+        fromDate: LocalDate,
         amount: Double,
         cadenceUnit: String,
         cadenceValue: Int,

@@ -68,7 +68,7 @@ graph TD
 
 | Entity field | Entity type | Domain field | Domain type |
 |---|---|---|---|
-| date | Long | date | LocalDate |
+| date | LocalDate (Room TypeConverter stores as Long) | date | LocalDate - no manual conversion |
 | transactionType | String | transactionType | TransactionType enum |
 | cadenceUnit | String | cadenceUnit | CadenceUnit enum |
 | tags | String JSON | tags | Set of String |

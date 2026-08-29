@@ -5,11 +5,13 @@ import com.example.personalfinances.data.repository.ExpenseRepositoryImpl
 import com.example.personalfinances.data.repository.IncomeRepositoryImpl
 import com.example.personalfinances.data.repository.SavingsGoalRepositoryImpl
 import com.example.personalfinances.data.repository.SettingsRepositoryImpl
+import com.example.personalfinances.data.repository.TransactionRepositoryImpl
 import com.example.personalfinances.domain.repository.AuthRepository
 import com.example.personalfinances.domain.repository.ExpenseRepository
 import com.example.personalfinances.domain.repository.IncomeRepository
 import com.example.personalfinances.domain.repository.SavingsGoalRepository
 import com.example.personalfinances.domain.repository.SettingsRepository
+import com.example.personalfinances.domain.repository.TransactionRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -40,4 +42,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds @Singleton
+    abstract fun bindTransactionRepository(impl: TransactionRepositoryImpl): TransactionRepository
 }

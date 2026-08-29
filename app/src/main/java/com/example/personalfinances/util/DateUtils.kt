@@ -1,6 +1,7 @@
 package com.example.personalfinances.util
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -19,6 +20,21 @@ object DateUtils {
         val nextDay = startDay.coerceIn(1, month.plusMonths(1).lengthOfMonth())
         val end = month.plusMonths(1).atDay(nextDay).atStartOfDay(zone).toInstant().toEpochMilli()
         return start to end
+    }
+
+    /**
+     * Returns the inclusive [start, end] date range for [month], where each period begins on
+     * [startDay] of the calendar month. Mirrors [monthBounds], but as [LocalDate]s with an
+     * inclusive end (the day before the next period starts), matching the repository's
+     * date-range queries.
+     *
+     * Example with startDay = 25: for May 2026 returns May 25 to Jun 24.
+     */
+    fun monthDateRange(month: YearMonth, startDay: Int = 1): Pair<LocalDate, LocalDate> {
+        val start = month.atDay(startDay.coerceIn(1, month.lengthOfMonth()))
+        val next = month.plusMonths(1)
+        val nextStart = next.atDay(startDay.coerceIn(1, next.lengthOfMonth()))
+        return start to nextStart.minusDays(1)
     }
 
     fun Long.toYearMonth(): YearMonth {

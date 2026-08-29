@@ -32,6 +32,12 @@ Android personal finance tracker built with Jetpack Compose, Room, Hilt, and Kot
 ## Before Starting Work
 Check `BACKLOG.md` for the current list of planned features and their status. Pick up the next "To do" item unless directed otherwise.
 
+## Documentation
+Keep all documentation in sync with the current state of the codebase at all times. This includes:
+- `BACKLOG.md` — mark items as done when complete, update in-progress checklists as tasks are finished
+- `docs/architecture/` — update diagrams when new files, layers, or relationships are added or removed
+- `ARCHITECTURE.md` — update if the layer structure itself changes
+
 ## Testing
 No automated tests currently exist. Verify changes manually by building and running the app on an emulator or device. Key flows to check after any change:
 - Add / delete an expense (one-off and recurring series)

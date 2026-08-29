@@ -7,6 +7,7 @@ import androidx.room.ForeignKey.Companion.RESTRICT
 import androidx.room.ForeignKey.Companion.SET_NULL
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.time.LocalDate
 
 @Entity(
     tableName="transactions",
@@ -30,7 +31,7 @@ data class TransactionEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "transaction_type")val transactionType: String,
     val amount : Double,
-    val date: Long,
+    val date: LocalDate,
     @ColumnInfo(name = "cadence_unit")val cadenceUnit: String,
     @ColumnInfo(name = "cadence_value")val cadenceValue: Int,
     @ColumnInfo(name = "category_id") val categoryId: String,

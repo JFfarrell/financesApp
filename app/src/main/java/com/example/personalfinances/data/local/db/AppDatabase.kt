@@ -2,6 +2,8 @@ package com.example.personalfinances.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
 import com.example.personalfinances.data.local.db.dao.CategoryDao
 import com.example.personalfinances.data.local.db.dao.ExpenseDao
 import com.example.personalfinances.data.local.db.dao.IncomeDao
@@ -14,6 +16,9 @@ import com.example.personalfinances.data.local.db.entity.TransactionEntity
 import com.example.personalfinances.data.local.db.entity.legacy.ExpenseEntity
 import com.example.personalfinances.data.local.db.entity.legacy.IncomeEntity
 import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntity
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * Root Room database for the app.
@@ -31,6 +36,7 @@ import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntit
  * so no explicit migration SQL is needed during development — the database is recreated on
  * version bumps. This should be replaced with proper migrations before shipping.
  */
+@TypeConverters(AppDatabase::class)
 @Database(
     entities = [
         ExpenseEntity::class,
@@ -50,4 +56,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun merchantDao(): MerchantDao
     abstract fun categoryDao(): CategoryDao
+
+
+    @TypeConverter
+    fun longToLocalDate(value: Long?): LocalDate? =
+        value?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+
+    @TypeConverter
+    fun localDateToLong(date: LocalDate?): Long? =
+        date?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+
 }
