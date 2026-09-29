@@ -29,14 +29,26 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
         composable(AppDestination.Main.route) {
-            MainScaffold()
+            MainScaffold(
+                onLogout = {
+                    // Back to the login screen; dropping Main also discards the tab screens' state.
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(AppDestination.Main.route) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }
 
+/**
+ * The signed-in app shell: the tab destinations plus the floating bottom bar. [onLogout] is
+ * called when the user chooses Log out in the Home settings sheet.
+ */
 @Composable
-fun MainScaffold() {
+fun MainScaffold(onLogout: () -> Unit) {
     val bottomNavController = rememberNavController()
+
     Scaffold(
         bottomBar = { BottomNavBar(navController = bottomNavController) }
     ) { innerPadding ->
@@ -45,7 +57,7 @@ fun MainScaffold() {
             startDestination = AppDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(AppDestination.Home.route)     { DashboardScreen() }
+            composable(AppDestination.Home.route)     { DashboardScreen(onLogout = onLogout) }
             composable(AppDestination.Calendar.route) { CalendarScreen() }
             composable(AppDestination.Savings.route)  { SavingsScreen() }
         }

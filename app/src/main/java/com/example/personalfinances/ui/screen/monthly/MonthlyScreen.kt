@@ -1,36 +1,48 @@
 package com.example.personalfinances.ui.screen.monthly
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.domain.model.Transaction
@@ -38,99 +50,105 @@ import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.ui.component.MonthSelector
 import com.example.personalfinances.ui.component.TransactionListItem
 import com.example.personalfinances.ui.screen.transaction.AddTransactionBottomSheet
+import com.example.personalfinances.ui.theme.wallet
+import com.example.personalfinances.util.CurrencyFormatter
 import com.example.personalfinances.util.DateUtils
+import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Which transactions the list shows; [type] null means all of them. */
+private enum class TransactionFilter(val label: String, val type: TransactionType?) {
+    ALL("All", null),
+    EXPENSES("Expenses", TransactionType.EXPENSE),
+    INCOME("Income", TransactionType.INCOME),
+    SAVINGS("Savings", TransactionType.SAVING)
+}
+
+/**
+ * Transactions screen: the selected month's transactions grouped by day, newest first, with
+ * filter chips for the type. Tapping a row edits it and swiping left deletes it. The add button
+ * in the top right opens the add sheet.
+ */
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    var filter by rememberSaveable { mutableStateOf(TransactionFilter.ALL) }
 
     val defaultDate = DateUtils.monthDateRange(uiState.selectedMonth, uiState.payCycleStartDay).first
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Calendar") }) }
-    ) { innerPadding ->
-        Column(
+    // One-off and recurring transactions are shown together, grouped by day.
+    val byDay = (uiState.transactions + uiState.recurringTransactions)
+        .filter { filter.type == null || it.transactionType == filter.type }
+        .sortedByDescending { it.date }
+        .groupBy { it.date }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+    ) {
+        // Same height as the Home header so the month pill does not jump when switching tabs.
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp)
+                .height(44.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            MonthSelector(
-                selectedMonth = uiState.selectedMonth,
-                onPreviousMonth = { viewModel.onEvent(CalendarEvent.PreviousMonth) },
-                onNextMonth = { viewModel.onEvent(CalendarEvent.NextMonth) }
-            )
-
-            HorizontalDivider()
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Text(text = "Transactions", style = MaterialTheme.typography.headlineSmall)
+            IconButton(
+                onClick = {
+                    viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.EXPENSE))
+                },
+                modifier = Modifier.size(44.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.wallet.addButton,
+                    contentColor = MaterialTheme.wallet.onAddButton
+                )
             ) {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.EXPENSE))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("+ Expense") }
-
-                OutlinedButton(
-                    onClick = {
-                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.INCOME))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("+ Income") }
-
-                OutlinedButton(
-                    onClick = {
-                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.SAVING))
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("+ Savings") }
+                Icon(Icons.Default.Add, contentDescription = "Add transaction")
             }
+        }
+        MonthSelector(
+            selectedMonth = uiState.selectedMonth,
+            onPreviousMonth = { viewModel.onEvent(CalendarEvent.PreviousMonth) },
+            onNextMonth = { viewModel.onEvent(CalendarEvent.NextMonth) },
+            payCycleStartDay = uiState.payCycleStartDay
+        )
+        FilterRow(selected = filter, onSelected = { filter = it })
 
-            HorizontalDivider()
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                when {
-                    uiState.isLoading -> CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    uiState.transactions.isEmpty() && uiState.recurringTransactions.isEmpty() ->
-                        Text(
-                            text = "No transactions for this month.",
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(16.dp)
-                        )
-                    else -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            // One section per transaction type: one-off entries first, then a
-                            // "Recurring" sub-section.
-                            TransactionType.entries.forEach { type ->
-                                val oneOff = uiState.transactions.filter { it.transactionType == type }
-                                val recurring = uiState.recurringTransactions.filter { it.transactionType == type }
-                                if (oneOff.isNotEmpty() || recurring.isNotEmpty()) {
-                                    item(key = "header_${type.name}") {
-                                        SectionHeader(sectionTitle(type))
-                                    }
-                                    items(oneOff, key = { it.id }) { transaction ->
-                                        TransactionRow(transaction, viewModel::onEvent)
-                                    }
-                                    if (recurring.isNotEmpty()) {
-                                        item(key = "recurring_${type.name}") {
-                                            SubSectionHeader("Recurring")
-                                        }
-                                        items(recurring, key = { it.id }) { transaction ->
-                                            TransactionRow(transaction, viewModel::onEvent)
-                                        }
-                                    }
-                                }
-                            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                uiState.isLoading -> CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                byDay.isEmpty() -> Text(
+                    text = if (filter == TransactionFilter.ALL) "No transactions for this month."
+                    else "No ${filter.label.lowercase()} for this month.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.wallet.muted,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    byDay.forEach { (date, dayItems) ->
+                        item(key = "header_$date") {
+                            DayHeader(
+                                label = date.format(DateTimeFormatter.ofPattern("EEE d MMM")),
+                                total = dayTotal(dayItems)
+                            )
+                        }
+                        item(key = "group_$date") {
+                            DayCard(items = dayItems, onEvent = viewModel::onEvent)
                         }
                     }
+                    item { Box(Modifier.height(8.dp)) }
                 }
             }
         }
@@ -143,6 +161,8 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             defaultDate = defaultDate,
             categories = uiState.categories,
             onCreateCategory = { viewModel.onEvent(CalendarEvent.AddCategory(it)) },
+            merchants = uiState.merchants,
+            onCreateMerchant = { viewModel.onEvent(CalendarEvent.AddMerchant(it)) },
             onDismiss = { viewModel.onEvent(CalendarEvent.HideTransactionSheet) },
             onSave = { transaction, durationMonths ->
                 val event = if (uiState.transactionSheetTarget == null)
@@ -175,25 +195,106 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     }
 }
 
-/** Section title shown above each transaction type's entries. */
-private fun sectionTitle(type: TransactionType): String = when (type) {
-    TransactionType.EXPENSE -> "Expenses"
-    TransactionType.INCOME -> "Income"
-    TransactionType.SAVING -> "Savings"
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterRow(selected: TransactionFilter, onSelected: (TransactionFilter) -> Unit) {
+    val wallet = MaterialTheme.wallet
+    // Scrolls sideways when the chips are wider than the screen, so a chip is never squeezed
+    // (which made its label wrap onto a second line on narrower phones).
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        TransactionFilter.entries.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelected(option) },
+                label = {
+                    Text(
+                        text = option.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                },
+                shape = CircleShape,
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = wallet.cardTonal,
+                    labelColor = wallet.text,
+                    selectedContainerColor = wallet.selected,
+                    selectedLabelColor = wallet.onSelected
+                )
+            )
+        }
+    }
 }
 
-/** A transaction row with swipe-to-delete; tapping opens the edit sheet. */
 @Composable
-private fun TransactionRow(
-    transaction: Transaction,
-    onEvent: (CalendarEvent) -> Unit
-) {
-    SwipeToDeleteBox(onDelete = { onEvent(CalendarEvent.DeleteTransaction(transaction)) }) {
-        TransactionListItem(
-            transaction = transaction,
-            onClick = { onEvent(CalendarEvent.ShowEditTransactionSheet(transaction)) }
-        )
+private fun DayHeader(label: String, total: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, top = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.wallet.muted)
+        Text(total, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.wallet.muted)
     }
+}
+
+/**
+ * A rounded card holding one day's transactions. Rows are separated by a hairline and each
+ * supports swipe-to-delete.
+ */
+@Composable
+private fun DayCard(items: List<Transaction>, onEvent: (CalendarEvent) -> Unit) {
+    val wallet = MaterialTheme.wallet
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(wallet.card)
+    ) {
+        items.forEachIndexed { index, transaction ->
+            SwipeToDeleteBox(onDelete = { onEvent(CalendarEvent.DeleteTransaction(transaction)) }) {
+                TransactionListItem(
+                    transaction = transaction,
+                    onClick = { onEvent(CalendarEvent.ShowEditTransactionSheet(transaction)) }
+                )
+            }
+            if (index < items.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = wallet.cardTonal
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The figure shown at the right of a day heading. Days with any income or expenses show their
+ * net (income minus expenses, signed); a day with only savings shows the amount saved.
+ */
+private fun dayTotal(items: List<Transaction>): String {
+    val hasCash = items.any { it.transactionType != TransactionType.SAVING }
+    if (!hasCash) return CurrencyFormatter.format(items.sumOf { it.amount })
+
+    val net = items.sumOf {
+        when (it.transactionType) {
+            TransactionType.INCOME -> it.amount
+            TransactionType.EXPENSE -> -it.amount
+            TransactionType.SAVING -> 0.0
+        }
+    }
+    val sign = if (net < 0) "−" else if (net > 0) "+" else ""
+    return sign + CurrencyFormatter.format(abs(net))
 }
 
 /**
@@ -221,25 +322,6 @@ private fun RecurringActionDialog(
                 Text("This only")
             }
         }
-    )
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-}
-
-@Composable
-private fun SubSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -281,7 +363,7 @@ private fun SwipeToDeleteBox(
             }
         }
     ) {
-        Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+        Box(modifier = Modifier.background(MaterialTheme.wallet.card)) {
             content()
         }
     }

@@ -88,7 +88,7 @@ Renamed label to "Home" and updated icon to `Icons.Default.Home`.
 ---
 
 ### 11. Unified Transaction Data Model Refactor
-**Status:** In progress
+**Status:** Done
 
 Replace the rigid two-entity model (Expense + Income with hardcoded enums) with a unified `Transaction` model. Categories and merchants become user-defined entities. Tags replace the enum hierarchy for flexible analytics.
 
@@ -125,14 +125,14 @@ See memory for full agreed data model spec.
 - [x] `GetCategoriesUseCase`, `AddCategoryUseCase`, `GetMerchantsUseCase`, `AddMerchantUseCase`
 - [x] Seed default categories via `RoomDatabase.Callback` in `DatabaseModule`
 - [x] Categories scoped by transaction type (`Category.type`, DB v8): separate expense, income and savings lists, seeded per type; the sheet filters the picker by the selected type
-- [ ] Optionally enforce `category.type == transactionType` in the add/update use cases (currently only the sheet keeps them consistent)
+- [x] Enforcing `category.type == transactionType` in the add/update use cases — moved to item 15
 - [x] `CalendarViewModel` exposes `categories` and `merchants`, with `AddCategory` / `AddMerchant` events
 
 #### Layer 4 — UI
-- [ ] Remove `HierarchicalTypeField` component
+- [x] Remove `HierarchicalTypeField` component
 - [x] New single category picker (dropdown with create-new inline; not searchable yet)
-- [ ] Tag input UI (add/remove tags, searchable existing tags) — sheet currently preserves tags on edit but does not expose them
-- [ ] Merchant input (searchable, create-new inline) — sheet currently preserves the merchant on edit but does not expose it
+- [x] Tag input UI — moved to item 15
+- [x] Merchant input — moved to item 15
 - [x] Unified `TransactionListItem` replacing `ExpenseListItem` + `IncomeListItem`
 - [x] `AddTransactionBottomSheet` replacing `AddExpenseBottomSheet` + `AddIncomeBottomSheet` (trimmed: type, amount, category, date, notes, recurring)
 - [x] `MonthlyScreen` (`CalendarScreen`) migrated to the unified state, events and sheet
@@ -140,7 +140,7 @@ See memory for full agreed data model spec.
 #### Cleanup (after all layers done)
 - [x] Delete legacy files: `Expense`, `Income`, `ExpenseType`, `ExpenseCategory`, `IncomeType`, `LegacyTransactionType`
 - [x] Delete legacy entities, DAOs, mappers, repositories, use cases and UI; `SavingsGoalEntity` and `SavingsGoalMapper` moved out of `legacy/`; `DatabaseModule`, `RepositoryModule` and `AppDatabase` updated (DB v9); `DateUtils` reduced to `monthDateRange`
-- [ ] Verify by building and running, then set item 11's status to Done
+- [x] Verified by building and running
 
 ---
 
@@ -176,5 +176,72 @@ Filter and group transactions by tag for analytics screens. Requires `getByTag` 
 
 ---
 
+### 15. Merchant Input, Tag Input and Category/Type Consistency
+**Status:** To do
+
+The data model supports merchants and tags, and the sheet now exposes both.
+- [x] Merchant dropdown with inline create, using the shared `CreatablePicker` (also used for categories); typing an existing name selects it instead of duplicating.
+- [x] Tag input: `TagInput` chip field, one tag at a time (Done key, Add button, space or comma). Tags are normalised by `normalizeTag` (lowercase, no `#`, inner spaces become hyphens). Suggestions from existing tags were deliberately left out.
+- [ ] Optionally enforce `category.type == transactionType` in the add and update use cases, handling the error gracefully rather than crashing the ViewModel.
+
+**Complexity:** Medium — the tag chip input is the new piece.
+
+---
+
+### 16. Real Room Migrations
+**Status:** To do
+
+`fallbackToDestructiveMigration()` wipes every table on any version bump. Before the app holds real data, replace it with explicit `Migration` objects, tested with `MigrationTestHelper` against the schema files in `app/schemas/` (keep every shipped version's file).
+
+**Complexity:** Small per migration; a habit change more than a feature.
+
+---
+
+### 17. Backup and Restore
+**Status:** To do
+
+A lossless, versioned export of all data (transactions, categories, merchants, savings goal) as JSON or CSV, saved to a location the user picks (Storage Access Framework), plus an Import that merges it back. Ids are UUIDs and inserts use REPLACE, so re-importing the same file is safe. The spreadsheet export (item 4) is a report layered on the same data, not a substitute for this.
+
+**Complexity:** Medium.
+
+---
+
+### 18. Auto Backup Rules
+**Status:** Done
+
+Auto Backup was already on (`allowBackup="true"`). Added explicit `backup_rules.xml` and `data_extraction_rules.xml`: everything is backed up (including the Room database) except `auth_prefs`, which holds the password hash, from cloud backups. Note the pay-cycle setting shares that store, so it is not restored from cloud backups either.
+
+---
+
+### 19. Password Hashing
+**Status:** To do
+
+`PasswordHasher` uses an unsalted SHA-256, which is weak against guessing for short passwords. Replace with a salted, slow key-derivation function (e.g. PBKDF2, or Argon2/bcrypt via a library), with a per-user salt and a stored parameter version so existing hashes can be upgraded on next login. Consider splitting the pay-cycle setting into its own DataStore so backup rules can treat the two separately.
+
+**Complexity:** Small-Medium.
+
+---
+
+### 20. UI Refresh: Light and Dark Themes
+**Status:** Done (needs on-device check)
+
+One layout with two palettes (light "Calm", dark "Focus"), chosen from design mockups.
+- [x] Theme foundation: `WalletColors` (light and dark), Material colour scheme mapping, rounder shapes, Figtree variable font
+- [x] Theme mode (System, Light, Dark): `ThemeMode`, stored in DataStore, `AppViewModel`, applied in `MainActivity` with system bar styling
+- [x] Floating bottom bar with three tabs; the add button sits at the top right of the Transactions screen
+- [x] Month pill showing the pay-cycle date range
+- [x] Home: hero card, spending donut, savings goal card, Settings sheet with the appearance tiles
+- [x] Transactions: filter chips, day-grouped cards, new row with category avatar, merchant, tags and repeat icon
+- [x] Add sheet: type control, keypad, category chips, detail chips with inline editors
+- [x] Savings screen restyled; progress arc uses theme colours
+- [x] Login screen keeps its old layout; the theme now supplies a background so the password text is readable in dark mode
+- [x] Log out button in the Settings sheet: returns to the login screen (the saved password is kept)
+- [ ] Optional: show/hide toggle on the password field
+- [ ] Extra themes later: add a palette to `WalletColors.kt` and extend `ThemeMode`
+
+**Notes:** the add sheet's keypad is a custom composable; the phone keyboard is still used for notes, merchant names, tags and new categories. Category colours come from hashing the name, so two categories can share a colour.
+
+---
+
 ## Suggested Order
-1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 11 (in progress) → 2 → 12 → 4 → 5
+1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 11 ✅ → 18 ✅ → 15 → 16 → 17 → 19 → 20 ✅ → 2 → 12 → 13 → 14 → 4 → 5
