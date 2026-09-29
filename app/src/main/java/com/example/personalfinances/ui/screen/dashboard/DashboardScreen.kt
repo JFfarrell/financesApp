@@ -88,15 +88,28 @@ import kotlin.math.roundToInt
  *
  * Drawn as three cards under the month picker: the summary ([SummaryHero]), the spending donut
  * ([CategoryDonutCard]) and the goal ([SavingsGoalCard]). The settings button opens
- * [SettingsSheet], which holds the appearance choice, the pay-cycle start day and Log out
- * (which calls [onLogout]).
+ * [SettingsSheet], which holds the appearance choice, the pay-cycle start day, a link to the
+ * category and merchant manager ([onOpenManage]), backup, and Log out (which calls [onLogout]).
+ * A card at the top reminds the user to back up when there is data and no recent backup.
  */
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onOpenManage: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // The system file picker: no storage permission is needed, and the user chooses where the
+    // backup lives (device storage, a cloud drive, an SD card, ...). Shared by the reminder card
+    // and the Settings sheet.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) viewModel.onEvent(DashboardEvent.ExportBackup(uri.toString())) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) viewModel.onEvent(DashboardEvent.RequestImport(uri.toString())) }
+    val startExport = { exportLauncher.launch("personal-wallot-backup-${LocalDate.now()}.json") }
 
     Column(
         modifier = Modifier
@@ -124,6 +137,23 @@ fun DashboardScreen(
                     .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                val reminder = uiState.backupReminder
+                if (reminder != null && !uiState.reminderDismissed) {
+                    BackupReminderCard(
+                        daysSince = reminder.daysSince,
+                        onBackUp = startExport,
+                        onLater = { viewModel.onEvent(DashboardEvent.DismissBackupReminder) }
+                    )
+                }
+                // Result of a backup started from the reminder (the Settings sheet shows its own).
+                val backupMessage = uiState.backupMessage
+                if (backupMessage != null && !uiState.isSettingsSheetOpen) {
+                    BackupMessageRow(
+                        message = backupMessage,
+                        isError = uiState.backupIsError,
+                        onDismiss = { viewModel.onEvent(DashboardEvent.DismissBackupMessage) }
+                    )
+                }
                 SummaryHero(
                     remainder = uiState.remainder,
                     spent = uiState.totalSpent,
@@ -151,8 +181,13 @@ fun DashboardScreen(
             isBackupBusy = uiState.isBackupBusy,
             backupMessage = uiState.backupMessage,
             backupIsError = uiState.backupIsError,
-            onExport = { viewModel.onEvent(DashboardEvent.ExportBackup(it)) },
-            onImportPicked = { viewModel.onEvent(DashboardEvent.RequestImport(it)) },
+            onExportClick = startExport,
+            onImportClick = { importLauncher.launch(arrayOf("*/*")) },
+            onManage = {
+                // Close the sheet first, or it would still be open when the user comes back.
+                viewModel.onEvent(DashboardEvent.HideSettingsSheet)
+                onOpenManage()
+            },
             onLogout = onLogout
         )
     }
@@ -419,6 +454,71 @@ private fun SavingsGoalCard(target: Double, current: Double, savedThisCycle: Dou
 }
 
 /**
+ * A nudge to back up: shown when there is data but no backup yet, or the last one is old.
+ * "Back up now" opens the file picker straight away; "Later" hides it until the next launch.
+ */
+@Composable
+private fun BackupReminderCard(daysSince: Int?, onBackUp: () -> Unit, onLater: () -> Unit) {
+    val wallet = MaterialTheme.wallet
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(wallet.navIndicator)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "Back up your data",
+            style = MaterialTheme.typography.titleSmall,
+            color = wallet.onNavIndicator
+        )
+        Text(
+            text = if (daysSince == null) {
+                "You haven't made a backup yet. Save a copy so your data survives losing or resetting this phone."
+            } else {
+                "Your last backup was $daysSince days ago. Save a fresh copy to keep it safe."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = wallet.onNavIndicator
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        ) {
+            TextButton(onClick = onLater) { Text("Later", color = wallet.onNavIndicator) }
+            Button(onClick = onBackUp) { Text("Back up now") }
+        }
+    }
+}
+
+/** One-line result of a backup started from the reminder, with an OK to dismiss it. */
+@Composable
+private fun BackupMessageRow(message: String, isError: Boolean, onDismiss: () -> Unit) {
+    val wallet = MaterialTheme.wallet
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(wallet.card)
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isError) MaterialTheme.colorScheme.error else wallet.text,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onDismiss) { Text("OK") }
+    }
+}
+
+/**
  * Settings bottom sheet. Choosing an appearance applies immediately; the pay-cycle day is applied
  * with Save, which also closes the sheet.
  */
@@ -434,21 +534,14 @@ private fun SettingsSheet(
     isBackupBusy: Boolean,
     backupMessage: String?,
     backupIsError: Boolean,
-    onExport: (String) -> Unit,
-    onImportPicked: (String) -> Unit,
+    onExportClick: () -> Unit,
+    onImportClick: () -> Unit,
+    onManage: () -> Unit,
     onLogout: () -> Unit
 ) {
     val wallet = MaterialTheme.wallet
     val sheetState = rememberModalBottomSheetState()
 
-    // The system file picker: no storage permission is needed, and the user chooses where the
-    // backup lives (device storage, a cloud drive, an SD card, ...).
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> if (uri != null) onExport(uri.toString()) }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) onImportPicked(uri.toString()) }
 
     val lastBackupText = lastBackupAt?.let {
         "Last backup: " + Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
@@ -540,6 +633,15 @@ private fun SettingsSheet(
                 Text("Save")
             }
 
+            OutlinedButton(
+                onClick = onManage,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                border = BorderStroke(1.dp, wallet.outline),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
+            ) { Text("Categories & merchants") }
+
             Text(
                 text = "Backup",
                 style = MaterialTheme.typography.labelLarge,
@@ -549,7 +651,7 @@ private fun SettingsSheet(
             Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = wallet.muted)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
-                    onClick = { exportLauncher.launch("wallot-backup-${LocalDate.now()}.json") },
+                    onClick = onExportClick,
                     enabled = !isBackupBusy,
                     modifier = Modifier
                         .weight(1f)
@@ -558,7 +660,7 @@ private fun SettingsSheet(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
                 ) { Text("Export") }
                 OutlinedButton(
-                    onClick = { importLauncher.launch(arrayOf("*/*")) },
+                    onClick = onImportClick,
                     enabled = !isBackupBusy,
                     modifier = Modifier
                         .weight(1f)

@@ -7,6 +7,7 @@ local.properties
 
 # Signing keys
 *.keystore
+keystore.properties
 *.jks
 
 # SQLite (precaution — Room DBs live on device, not in project)

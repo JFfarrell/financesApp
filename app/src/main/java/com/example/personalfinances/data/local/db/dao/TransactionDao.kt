@@ -33,6 +33,19 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE category_id = :categoryId")
     fun getByCategory(categoryId: String) : Flow<List<TransactionEntity>>
 
+    /** Number of transactions per category, for the categories that have any. */
+    @Query("SELECT category_id AS id, COUNT(*) AS count FROM transactions GROUP BY category_id")
+    fun getCategoryUsage(): Flow<List<UsageCount>>
+
+    /** Number of transactions per merchant, for the merchants that have any. */
+    @Query("""SELECT merchant_id AS id, COUNT(*) AS count FROM transactions
+            WHERE merchant_id IS NOT NULL GROUP BY merchant_id""")
+    fun getMerchantUsage(): Flow<List<UsageCount>>
+
+    /** Every transaction in a recurring series dated on or after [fromDate]. */
+    @Query("SELECT * FROM transactions WHERE recurring_group_id = :groupId AND date >= :fromDate")
+    suspend fun getSeriesFromDate(groupId: String, fromDate: LocalDate): List<TransactionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: TransactionEntity)
 

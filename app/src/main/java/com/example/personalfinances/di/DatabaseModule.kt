@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.personalfinances.data.local.db.AppDatabase
+import com.example.personalfinances.data.local.db.Migrations
 import com.example.personalfinances.data.local.db.dao.BackupDao
 import com.example.personalfinances.data.local.db.dao.CategoryDao
 import com.example.personalfinances.data.local.db.dao.MerchantDao
@@ -61,6 +62,7 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "personal_finances.db")
+            .addMigrations(Migrations.MIGRATION_9_10)
             .addCallback(SeedCategoriesCallback)
             .build()
 

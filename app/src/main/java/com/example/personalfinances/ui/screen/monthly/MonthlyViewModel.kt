@@ -14,6 +14,7 @@ import com.example.personalfinances.domain.usecase.merchant.GetMerchantsUseCase
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.domain.usecase.transaction.AddTransactionUseCase
 import com.example.personalfinances.domain.usecase.transaction.DeleteTransactionSeriesUseCase
+import com.example.personalfinances.domain.usecase.transaction.GetTransactionSeriesUseCase
 import com.example.personalfinances.domain.usecase.transaction.DeleteTransactionUseCase
 import com.example.personalfinances.domain.usecase.transaction.GetTransactionsByMonthUseCase
 import com.example.personalfinances.domain.usecase.transaction.UpdateTransactionSeriesUseCase
@@ -54,6 +55,8 @@ sealed class RecurringDialogState {
  * [categories] and [merchants] feed the pickers in the transaction sheet.
  *
  * [recurringDialog] is non-None when a recurring-scope prompt is waiting for user input.
+ *
+ * [undoDelete] holds the most recent delete while its Undo prompt is showing.
  */
 data class CalendarUiState(
     val selectedMonth: YearMonth = YearMonth.now(),
@@ -66,7 +69,19 @@ data class CalendarUiState(
     val sheetDefaultType: TransactionType = TransactionType.EXPENSE,
     val categories: List<Category> = emptyList(),
     val merchants: List<Merchant> = emptyList(),
-    val recurringDialog: RecurringDialogState = RecurringDialogState.None
+    val recurringDialog: RecurringDialogState = RecurringDialogState.None,
+    val undoDelete: PendingUndo? = null
+)
+
+/**
+ * A delete the user can still take back: the removed [transactions] and the [message] to show.
+ * [token] makes every delete a distinct value, so the screen shows a fresh Undo prompt even when
+ * the same transaction is deleted, restored and deleted again.
+ */
+data class PendingUndo(
+    val transactions: List<Transaction>,
+    val message: String,
+    val token: Long = System.nanoTime()
 )
 
 /** All actions a user can take on the Calendar screen. */
@@ -91,6 +106,12 @@ sealed class CalendarEvent {
     data class ConfirmDelete(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
     data class ConfirmUpdate(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
     object DismissRecurringDialog : CalendarEvent()
+
+    /** Puts back the transactions removed by the last delete. */
+    object UndoLastDelete : CalendarEvent()
+
+    /** The Undo prompt went away without being used. */
+    object ClearUndo : CalendarEvent()
 }
 
 /**
@@ -111,6 +132,7 @@ class CalendarViewModel @Inject constructor(
     private val updateTransactionSeriesUseCase: UpdateTransactionSeriesUseCase,
     private val deleteTransactionUseCase: DeleteTransactionUseCase,
     private val deleteTransactionSeriesUseCase: DeleteTransactionSeriesUseCase,
+    private val getTransactionSeriesUseCase: GetTransactionSeriesUseCase,
     private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase,
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val addCategoryUseCase: AddCategoryUseCase,
@@ -167,6 +189,27 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /** Deletes one transaction and offers to undo it. */
+    private suspend fun deleteOne(transaction: Transaction) {
+        deleteTransactionUseCase(transaction)
+        _uiState.update {
+            it.copy(undoDelete = PendingUndo(listOf(transaction), "Deleted ${transaction.category.name}"))
+        }
+    }
+
+    /**
+     * Deletes [transaction] and every later transaction in its series. The whole set is fetched
+     * first, since the screen only holds the current month, so Undo can restore all of it.
+     */
+    private suspend fun deleteSeries(transaction: Transaction) {
+        val groupId = transaction.recurringGroupId ?: return deleteOne(transaction)
+        val removed = getTransactionSeriesUseCase(groupId, transaction.date)
+        deleteTransactionSeriesUseCase(groupId, transaction.date)
+        _uiState.update {
+            it.copy(undoDelete = PendingUndo(removed, "Deleted ${removed.size} transactions"))
+        }
+    }
+
     /** Processes a user action from the Calendar screen. */
     fun onEvent(event: CalendarEvent) {
         when (event) {
@@ -218,19 +261,25 @@ class CalendarViewModel @Inject constructor(
                         it.copy(recurringDialog = RecurringDialogState.PendingDelete(event.transaction))
                     }
                 } else {
-                    viewModelScope.launch { deleteTransactionUseCase(event.transaction) }
+                    viewModelScope.launch { deleteOne(event.transaction) }
                 }
             }
 
             is CalendarEvent.ConfirmDelete -> viewModelScope.launch {
                 when (event.scope) {
-                    RecurringScope.THIS_ONLY -> deleteTransactionUseCase(event.transaction)
-                    RecurringScope.THIS_AND_FUTURE -> deleteTransactionSeriesUseCase(
-                        event.transaction.recurringGroupId!!, event.transaction.date
-                    )
+                    RecurringScope.THIS_ONLY -> deleteOne(event.transaction)
+                    RecurringScope.THIS_AND_FUTURE -> deleteSeries(event.transaction)
                 }
                 _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
             }
+
+            CalendarEvent.UndoLastDelete -> viewModelScope.launch {
+                val pending = _uiState.value.undoDelete
+                _uiState.update { it.copy(undoDelete = null) }
+                // Same ids as before, so restored transactions keep their identity and series link.
+                pending?.transactions?.forEach { addTransactionUseCase(it) }
+            }
+            CalendarEvent.ClearUndo -> _uiState.update { it.copy(undoDelete = null) }
 
             is CalendarEvent.ConfirmUpdate -> viewModelScope.launch {
                 when (event.scope) {

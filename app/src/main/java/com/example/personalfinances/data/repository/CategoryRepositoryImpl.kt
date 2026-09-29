@@ -1,6 +1,7 @@
 package com.example.personalfinances.data.repository
 
 import com.example.personalfinances.data.local.db.dao.CategoryDao
+import com.example.personalfinances.data.local.db.dao.TransactionDao
 import com.example.personalfinances.data.mapper.toDomain
 import com.example.personalfinances.data.mapper.toEntity
 import com.example.personalfinances.domain.model.Category
@@ -11,7 +12,8 @@ import javax.inject.Inject
 
 /** Room-backed [CategoryRepository]; converts between [Category] and its Room entity. */
 class CategoryRepositoryImpl @Inject constructor(
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
+    private val transactionDao: TransactionDao
 ) : CategoryRepository {
 
     override fun getAll(): Flow<List<Category>> =
@@ -22,4 +24,13 @@ class CategoryRepositoryImpl @Inject constructor(
 
     override suspend fun add(category: Category) =
         categoryDao.insertCategory(category.toEntity())
+
+    override fun getUsageCounts(): Flow<Map<String, Int>> =
+        transactionDao.getCategoryUsage().map { rows -> rows.associate { it.id to it.count } }
+
+    override suspend fun update(category: Category) =
+        categoryDao.updateCategory(category.toEntity())
+
+    override suspend fun delete(category: Category) =
+        categoryDao.deleteCategory(category.toEntity())
 }

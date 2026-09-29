@@ -251,5 +251,29 @@ One layout with two palettes (light "Calm", dark "Focus"), chosen from design mo
 
 ---
 
+### 21. Timezone-safe Dates, App Identity and Release Signing
+**Status:** Done (needs on-device check)
+
+Preparation for using the app permanently.
+- [x] Dates are stored as epoch days instead of local-midnight milliseconds, so they cannot shift by a day when the phone changes time zone. Database version 10 with `Migrations.MIGRATION_9_10` (converts existing rows) and a `MigrationTest` for it.
+- [x] `applicationId` is now `com.personalwallot`, app name "Personal Wallot"; debug builds are `com.personalwallot.debug` ("Personal Wallot (dev)") with separate data.
+- [x] Release signing configured from `keystore.properties`; without it the release build is signed with the debug key (fine for personal use; see CLAUDE.md).
+- [ ] Build the release APK and install it; uninstall the old `com.example.personalfinances` app.
+- [ ] Optional: create your own keystore (worth it if you build on several computers, share the app, or want to avoid the reinstall cycle).
+- [ ] Commit the generated `app/schemas/.../10.json`.
+
+---
+
+### 22. Undo, Backup Reminder and Category/Merchant Management
+**Status:** Done (needs on-device check)
+
+- [x] Undo after deleting a transaction or a "this and future" series (restores the whole set)
+- [x] Backup reminder card on Home (no backup yet, or last backup 14 or more days ago), with "Back up now" and "Later"
+- [x] Manage screen (Settings, then "Categories & merchants"): rename and delete, with usage counts. Blank and duplicate names refused; items in use cannot be deleted.
+- [ ] Merge two categories or merchants (move a category's transactions to another, then delete it)
+- [ ] Undo for other destructive actions (deleting a category or merchant is not undoable, but is only allowed when unused)
+
+---
+
 ## Suggested Order
 1 ✅ → 3 ✅ → 8 ✅ → 9 ✅ → 10 ✅ → 6 ✅ → 7 ~~dropped~~ → 11 ✅ → 18 ✅ → 15 → 16 → 17 → 19 → 20 ✅ → 2 → 12 → 13 → 14 → 4 → 5

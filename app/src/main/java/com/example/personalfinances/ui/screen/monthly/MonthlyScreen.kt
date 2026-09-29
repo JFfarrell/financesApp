@@ -29,15 +29,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +80,25 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var filter by rememberSaveable { mutableStateOf(TransactionFilter.ALL) }
 
+    // After a delete, offer Undo for a while. A new delete replaces the previous prompt (the effect
+    // restarts with the new token and the old snackbar is dismissed), so only the latest can be undone.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val pendingUndo = uiState.undoDelete
+    LaunchedEffect(pendingUndo?.token) {
+        if (pendingUndo != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = pendingUndo.message,
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.onEvent(CalendarEvent.UndoLastDelete)
+            } else {
+                viewModel.onEvent(CalendarEvent.ClearUndo)
+            }
+        }
+    }
+
     val defaultDate = DateUtils.monthDateRange(uiState.selectedMonth, uiState.payCycleStartDay).first
 
     // One-off and recurring transactions are shown together, grouped by day.
@@ -82,6 +107,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         .sortedByDescending { it.date }
         .groupBy { it.date }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -152,6 +178,13 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                 }
             }
         }
+    }
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 8.dp)
+    )
     }
 
     if (uiState.isTransactionSheetOpen) {

@@ -20,6 +20,8 @@ interface TransactionRepository {
     suspend fun add(transaction: Transaction)
     suspend fun update(transaction: Transaction)
     suspend fun delete(transaction: Transaction)
+    /** Every transaction in a recurring series dated on or after [date], for example to undo a delete. */
+    suspend fun getSeriesFromDate(recurringGroupId: String, date: LocalDate): List<Transaction>
     suspend fun deleteSeriesFromDate(recurringGroupId: String, date: LocalDate)
     suspend fun updateTransactionSeriesFromDate(date: LocalDate, transaction: Transaction)
 }

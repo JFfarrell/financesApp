@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,22 +9,56 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Release signing details live in keystore.properties (not committed; see
+// keystore.properties.example). Without it, release builds are signed with the debug key, which
+// is fine for personal use on one machine but is tied to that machine (see CLAUDE.md).
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
 android {
+    // The code's package name. Deliberately separate from applicationId below, which is the
+    // app's identity on the phone; changing that never requires touching the source.
     namespace = "com.example.personalfinances"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.personalfinances"
+        applicationId = "com.personalwallot"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        resValue("string", "app_name", "Personal Wallot")
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.isNotEmpty()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
+        // The debug build installs as a separate app (com.personalwallot.debug) with its own
+        // data, so testing can never touch the data in the real release app.
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "Personal Wallot (dev)")
+        }
         release {
+            signingConfig = if (keystoreProperties.isNotEmpty()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

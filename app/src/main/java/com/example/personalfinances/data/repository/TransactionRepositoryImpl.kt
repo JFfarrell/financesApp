@@ -98,6 +98,12 @@ class TransactionRepositoryImpl @Inject constructor(
         transactionDao.deleteTransaction(transaction.toEntity())
     }
 
+    override suspend fun getSeriesFromDate(
+        recurringGroupId: String,
+        date: LocalDate
+    ): List<Transaction> =
+        transactionDao.getSeriesFromDate(recurringGroupId, date).map { mapEntity(it) }
+
     override suspend fun deleteSeriesFromDate(
         recurringGroupId: String,
         date: LocalDate

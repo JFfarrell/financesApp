@@ -10,6 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.personalfinances.ui.screen.auth.LoginScreen
 import com.example.personalfinances.ui.screen.dashboard.DashboardScreen
+import com.example.personalfinances.ui.screen.manage.ManageScreen
 import com.example.personalfinances.ui.screen.monthly.CalendarScreen
 import com.example.personalfinances.ui.screen.savings.SavingsScreen
 
@@ -57,9 +58,17 @@ fun MainScaffold(onLogout: () -> Unit) {
             startDestination = AppDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(AppDestination.Home.route)     { DashboardScreen(onLogout = onLogout) }
+            composable(AppDestination.Home.route) {
+                DashboardScreen(
+                    onLogout = onLogout,
+                    onOpenManage = { bottomNavController.navigate(AppDestination.Manage.route) }
+                )
+            }
             composable(AppDestination.Calendar.route) { CalendarScreen() }
             composable(AppDestination.Savings.route)  { SavingsScreen() }
+            composable(AppDestination.Manage.route) {
+                ManageScreen(onBack = { bottomNavController.popBackStack() })
+            }
         }
     }
 }
