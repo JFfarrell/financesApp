@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.personalfinances.data.local.db.AppDatabase
+import com.example.personalfinances.data.local.db.dao.BackupDao
 import com.example.personalfinances.data.local.db.dao.CategoryDao
 import com.example.personalfinances.data.local.db.dao.MerchantDao
 import com.example.personalfinances.data.local.db.dao.SavingsGoalDao
@@ -21,9 +22,9 @@ import javax.inject.Singleton
 /**
  * Hilt module that provides the Room database and its DAOs as singletons.
  *
- * [fallbackToDestructiveMigration] means Room will drop and recreate the database when the
- * schema version changes and no explicit migration is provided. This is acceptable during
- * development but should be replaced with proper migrations before any production release.
+ * There is deliberately no destructive-migration fallback: if the schema version changes without
+ * a migration, Room refuses to open the database instead of wiping the user's data. Every schema
+ * change therefore needs a migration (see the "DB changes" notes in CLAUDE.md).
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -60,7 +61,6 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "personal_finances.db")
-            .fallbackToDestructiveMigration()
             .addCallback(SeedCategoriesCallback)
             .build()
 
@@ -75,4 +75,7 @@ object DatabaseModule {
 
     @Provides
     fun provideMerchantDao(db: AppDatabase): MerchantDao = db.merchantDao()
+
+    @Provides
+    fun provideBackupDao(db: AppDatabase): BackupDao = db.backupDao()
 }

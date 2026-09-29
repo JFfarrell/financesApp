@@ -3,6 +3,7 @@ package com.example.personalfinances.data.local.db
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.example.personalfinances.data.local.db.dao.BackupDao
 import com.example.personalfinances.data.local.db.dao.CategoryDao
 import com.example.personalfinances.data.local.db.dao.MerchantDao
 import com.example.personalfinances.data.local.db.dao.SavingsGoalDao
@@ -29,9 +30,11 @@ import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
  *  - 9: Removed the legacy ExpenseEntity and IncomeEntity tables; transactions, categories,
  *       merchants and savings goals remain
  *
- * [fallbackToDestructiveMigration] is set in [com.example.personalfinances.di.DatabaseModule],
- * so no explicit migration SQL is needed during development — the database is recreated on
- * version bumps. This should be replaced with proper migrations before shipping.
+ * Version 9 is the baseline for real data. Versions 1 to 8 were development-only and were wiped on
+ * each change. From version 9 on, every schema change must ship a migration (an `AutoMigration`
+ * for simple changes, otherwise a hand-written `Migration`), and the exported schema JSON for
+ * every version stays in `app/schemas/` so migrations can be tested. There is no destructive
+ * fallback, so a missing migration fails loudly instead of deleting data.
  */
 @TypeConverters(Converters::class)
 @Database(
@@ -49,5 +52,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun merchantDao(): MerchantDao
     abstract fun categoryDao(): CategoryDao
+    abstract fun backupDao(): BackupDao
 
 }

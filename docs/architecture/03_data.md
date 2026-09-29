@@ -10,6 +10,7 @@ graph TD
         TRI ~~~ CRI["CategoryRepositoryImpl"]
         CRI ~~~ MRI["MerchantRepositoryImpl"]
         MRI ~~~ SGRI["SavingsGoalRepositoryImpl"]
+        SGRI ~~~ BRI["BackupRepositoryImpl"]
     end
 
     subgraph Mappers["Mappers"]
@@ -24,6 +25,7 @@ graph TD
         TD ~~~ CD["CategoryDao"]
         CD ~~~ MD["MerchantDao"]
         MD ~~~ SGD["SavingsGoalDao"]
+        SGD ~~~ BD["BackupDao"]
     end
 
     subgraph Entities["Room Entities"]
@@ -45,6 +47,8 @@ graph TD
     CRI --> CM
     MRI --> MD
     MRI --> MM
+    BRI --> BD
+    BRI --> BF["BackupFile - JSON"]
     SGRI --> SGD
     SGRI --> SGM
 
@@ -76,4 +80,5 @@ graph TD
 ## Notes
 
 - `Converters` is a concrete class registered with `@TypeConverters` on `AppDatabase`. It cannot be `AppDatabase` itself because Room instantiates the converter class and `AppDatabase` is abstract.
-- `fallbackToDestructiveMigration` wipes all tables on any version bump. Replace with real migrations before storing real data (see backlog).
+- There is no destructive-migration fallback. Version 9 is the baseline; later schema changes need migrations and a `MigrationTest`.
+- `BackupDao` does bulk reads and `@Upsert` writes for backup and restore only. Backups use their own JSON shapes (`BackupFile`), separate from the Room entities, so the database can change without breaking old backups.

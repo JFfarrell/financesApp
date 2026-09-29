@@ -24,6 +24,7 @@ graph TD
         CR ~~~ MR["MerchantRepository"]
         MR ~~~ SGR["SavingsGoalRepository"]
         SGR ~~~ SR["SettingsRepository"]
+        SR ~~~ BR["BackupRepository"]
     end
 
     subgraph UseCases["Use Cases"]
@@ -31,6 +32,7 @@ graph TD
         TUC ~~~ CUC["Category and Merchant Use Cases"]
         CUC ~~~ SUC["Savings Use Cases"]
         SUC ~~~ STUC["Settings Use Cases"]
+        STUC ~~~ BUC["Backup Use Cases"]
     end
 
     Transaction --> TransactionType
@@ -40,6 +42,7 @@ graph TD
     Category --> TransactionType
 
     TUC --> TR
+    BUC --> BR
     CUC --> CR
     CUC --> MR
     SUC --> SGR

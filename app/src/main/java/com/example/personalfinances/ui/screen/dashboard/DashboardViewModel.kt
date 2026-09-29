@@ -2,9 +2,13 @@ package com.example.personalfinances.ui.screen.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.personalfinances.domain.model.BackupResult
 import com.example.personalfinances.domain.model.Transaction
 import com.example.personalfinances.domain.model.enums.ThemeMode
 import com.example.personalfinances.domain.model.enums.TransactionType
+import com.example.personalfinances.domain.usecase.backup.ExportBackupUseCase
+import com.example.personalfinances.domain.usecase.backup.GetLastBackupUseCase
+import com.example.personalfinances.domain.usecase.backup.ImportBackupUseCase
 import com.example.personalfinances.domain.usecase.savings.GetSavingsGoalUseCase
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.domain.usecase.settings.GetThemeModeUseCase
@@ -45,7 +49,10 @@ class DashboardViewModel @Inject constructor(
     private val getSavingsGoalUseCase: GetSavingsGoalUseCase,
     private val getSavingsTotalUseCase: GetSavingsTotalUseCase,
     private val getThemeModeUseCase: GetThemeModeUseCase,
-    private val setThemeModeUseCase: SetThemeModeUseCase
+    private val setThemeModeUseCase: SetThemeModeUseCase,
+    private val exportBackupUseCase: ExportBackupUseCase,
+    private val importBackupUseCase: ImportBackupUseCase,
+    private val getLastBackupUseCase: GetLastBackupUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -68,6 +75,10 @@ class DashboardViewModel @Inject constructor(
 
         getThemeModeUseCase().onEach { mode ->
             _uiState.update { it.copy(themeMode = mode) }
+        }.launchIn(viewModelScope)
+
+        getLastBackupUseCase().onEach { time ->
+            _uiState.update { it.copy(lastBackupAt = time) }
         }.launchIn(viewModelScope)
     }
 
@@ -115,7 +126,40 @@ class DashboardViewModel @Inject constructor(
             is DashboardEvent.SetThemeMode -> viewModelScope.launch {
                 setThemeModeUseCase(event.mode)
             }
+            is DashboardEvent.ExportBackup -> runBackup(isImport = false) { exportBackupUseCase(event.destination) }
+            // Importing can overwrite records, so the user confirms before anything is read.
+            is DashboardEvent.RequestImport -> _uiState.update { it.copy(pendingImport = event.source) }
+            DashboardEvent.CancelImport -> _uiState.update { it.copy(pendingImport = null) }
+            DashboardEvent.ConfirmImport -> {
+                val source = _uiState.value.pendingImport
+                _uiState.update { it.copy(pendingImport = null) }
+                if (source != null) runBackup(isImport = true) { importBackupUseCase(source) }
+            }
         }
+    }
+
+    /** Runs a backup [action], showing a busy state and then a one-line result message. */
+    private fun runBackup(isImport: Boolean, action: suspend () -> BackupResult) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBackupBusy = true, backupMessage = null) }
+            val result = action()
+            _uiState.update {
+                it.copy(
+                    isBackupBusy = false,
+                    backupMessage = describe(result, isImport),
+                    backupIsError = result is BackupResult.Failure
+                )
+            }
+        }
+    }
+
+    private fun describe(result: BackupResult, isImport: Boolean): String = when (result) {
+        is BackupResult.Success -> {
+            val counts = "${result.transactions} transactions, ${result.categories} categories, " +
+                "${result.merchants} merchants"
+            if (isImport) "Imported $counts." else "Backup saved: $counts."
+        }
+        is BackupResult.Failure -> result.message
     }
 }
 
@@ -154,6 +198,10 @@ private fun summarise(transactions: List<Transaction>): MonthSummary {
  * name to the total that went out under it (savings included) for the selected month.
  * [savingsCurrent] is the goal's starting amount plus all savings to date; [savingsTarget] is 0
  * when no goal has been set. [themeMode] is the user's saved appearance choice.
+ *
+ * Backup: [lastBackupAt] is when the last export finished (epoch milliseconds, null if never),
+ * [backupMessage] is the result line shown after an export or import ([backupIsError] marks a
+ * failure), and [pendingImport] holds a chosen file awaiting the user's confirmation.
  */
 data class DashboardUiState(
     val selectedMonth: YearMonth = YearMonth.now(),
@@ -166,6 +214,11 @@ data class DashboardUiState(
     val savingsTarget: Double = 0.0,
     val savingsCurrent: Double = 0.0,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val lastBackupAt: Long? = null,
+    val isBackupBusy: Boolean = false,
+    val backupMessage: String? = null,
+    val backupIsError: Boolean = false,
+    val pendingImport: String? = null,
     val isLoading: Boolean = true,
     val isSettingsSheetOpen: Boolean = false
 )
@@ -180,4 +233,8 @@ sealed class DashboardEvent {
     object HideSettingsSheet : DashboardEvent()
     data class SetPayCycleStartDay(val day: Int) : DashboardEvent()
     data class SetThemeMode(val mode: ThemeMode) : DashboardEvent()
+    data class ExportBackup(val destination: String) : DashboardEvent()
+    data class RequestImport(val source: String) : DashboardEvent()
+    object ConfirmImport : DashboardEvent()
+    object CancelImport : DashboardEvent()
 }

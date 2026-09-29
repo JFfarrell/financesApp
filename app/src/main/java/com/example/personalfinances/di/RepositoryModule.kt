@@ -1,12 +1,14 @@
 package com.example.personalfinances.di
 
 import com.example.personalfinances.data.repository.AuthRepositoryImpl
+import com.example.personalfinances.data.repository.BackupRepositoryImpl
 import com.example.personalfinances.data.repository.CategoryRepositoryImpl
 import com.example.personalfinances.data.repository.MerchantRepositoryImpl
 import com.example.personalfinances.data.repository.SavingsGoalRepositoryImpl
 import com.example.personalfinances.data.repository.SettingsRepositoryImpl
 import com.example.personalfinances.data.repository.TransactionRepositoryImpl
 import com.example.personalfinances.domain.repository.AuthRepository
+import com.example.personalfinances.domain.repository.BackupRepository
 import com.example.personalfinances.domain.repository.CategoryRepository
 import com.example.personalfinances.domain.repository.MerchantRepository
 import com.example.personalfinances.domain.repository.SavingsGoalRepository
@@ -42,6 +44,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindMerchantRepository(impl: MerchantRepositoryImpl): MerchantRepository
+
+    @Binds @Singleton
+    abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
 
     @Binds @Singleton
     abstract fun bindTransactionRepository(impl: TransactionRepositoryImpl): TransactionRepository

@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.example.personalfinances.domain.model.enums.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,7 @@ class SettingsDataStore @Inject constructor(
     companion object {
         val PAY_CYCLE_START_DAY_KEY = intPreferencesKey("pay_cycle_start_day")
         val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        val LAST_BACKUP_AT_KEY = longPreferencesKey("last_backup_at")
     }
 
     val payCycleStartDay: Flow<Int> = dataStore.data.map { it[PAY_CYCLE_START_DAY_KEY] ?: 1 }
@@ -40,5 +42,12 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun saveThemeMode(mode: ThemeMode) {
         dataStore.edit { it[THEME_MODE_KEY] = mode.name }
+    }
+
+    /** Emits when the last backup was saved (epoch milliseconds), or null if there never was one. */
+    val lastBackupAt: Flow<Long?> = dataStore.data.map { it[LAST_BACKUP_AT_KEY] }
+
+    suspend fun saveLastBackupAt(epochMillis: Long) {
+        dataStore.edit { it[LAST_BACKUP_AT_KEY] = epochMillis }
     }
 }

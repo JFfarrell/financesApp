@@ -87,10 +87,11 @@ private enum class DetailEditor { MERCHANT, NOTES, TAGS, REPEAT }
 /**
  * Modal bottom sheet for adding or editing a transaction of any [TransactionType].
  *
- * Built for quick entry: a segmented control picks the type, the amount is typed on an on-screen
- * keypad, and the category is one tap on a chip. Everything optional (date, merchant, notes,
- * tags, repeat) lives in a row of compact chips; tapping one opens its editor beneath the row,
- * and the date chip opens the date picker.
+ * Built for quick entry, top to bottom in the order things are filled in: a segmented control
+ * picks the type, the amount is typed on an on-screen keypad that sits directly beneath it, and
+ * the category is one tap on a chip. Everything optional (date, merchant, notes, tags, repeat)
+ * lives in a row of compact chips below that; tapping one opens its editor beneath the row, and
+ * the date chip opens the date picker. Save is last.
  *
  * When [initialTransaction] is null the sheet is in Add mode and pre-selects [defaultType];
  * otherwise it pre-populates every field. Editing keeps the transaction's id and recurring group.
@@ -225,6 +226,7 @@ fun AddTransactionBottomSheet(
             }
 
             AmountDisplay(amountText = amountText)
+            Keypad(onKey = { key -> amountText = applyKey(amountText, key) })
 
             Text("Category", style = MaterialTheme.typography.labelLarge, color = wallet.muted)
             FlowRow(
@@ -393,8 +395,6 @@ fun AddTransactionBottomSheet(
                 }
                 null -> Unit
             }
-
-            Keypad(onKey = { key -> amountText = applyKey(amountText, key) })
 
             Button(
                 onClick = {

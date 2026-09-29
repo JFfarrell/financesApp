@@ -1,5 +1,7 @@
 package com.example.personalfinances.ui.screen.dashboard
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +47,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,6 +76,10 @@ import com.example.personalfinances.ui.theme.DarkWalletColors
 import com.example.personalfinances.ui.theme.LightWalletColors
 import com.example.personalfinances.ui.theme.wallet
 import com.example.personalfinances.util.CurrencyFormatter
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -139,7 +147,32 @@ fun DashboardScreen(
             onThemeSelected = { viewModel.onEvent(DashboardEvent.SetThemeMode(it)) },
             onDismiss = { viewModel.onEvent(DashboardEvent.HideSettingsSheet) },
             onSave = { day -> viewModel.onEvent(DashboardEvent.SetPayCycleStartDay(day)) },
+            lastBackupAt = uiState.lastBackupAt,
+            isBackupBusy = uiState.isBackupBusy,
+            backupMessage = uiState.backupMessage,
+            backupIsError = uiState.backupIsError,
+            onExport = { viewModel.onEvent(DashboardEvent.ExportBackup(it)) },
+            onImportPicked = { viewModel.onEvent(DashboardEvent.RequestImport(it)) },
             onLogout = onLogout
+        )
+    }
+
+    if (uiState.pendingImport != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(DashboardEvent.CancelImport) },
+            title = { Text("Import backup?") },
+            text = {
+                Text(
+                    "Everything in the file is added. Anything that already exists here is replaced " +
+                        "by the version in the file. Nothing is deleted."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onEvent(DashboardEvent.ConfirmImport) }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onEvent(DashboardEvent.CancelImport) }) { Text("Cancel") }
+            }
         )
     }
 }
@@ -397,10 +430,30 @@ private fun SettingsSheet(
     onThemeSelected: (ThemeMode) -> Unit,
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit,
+    lastBackupAt: Long?,
+    isBackupBusy: Boolean,
+    backupMessage: String?,
+    backupIsError: Boolean,
+    onExport: (String) -> Unit,
+    onImportPicked: (String) -> Unit,
     onLogout: () -> Unit
 ) {
     val wallet = MaterialTheme.wallet
     val sheetState = rememberModalBottomSheetState()
+
+    // The system file picker: no storage permission is needed, and the user chooses where the
+    // backup lives (device storage, a cloud drive, an SD card, ...).
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) onExport(uri.toString()) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) onImportPicked(uri.toString()) }
+
+    val lastBackupText = lastBackupAt?.let {
+        "Last backup: " + Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm"))
+    } ?: "You have not made a backup yet."
     var dropdownExpanded by remember { mutableStateOf(false) }
     var selectedDay by remember { mutableStateOf(currentStartDay) }
 
@@ -485,6 +538,41 @@ private fun SettingsSheet(
                     .height(54.dp)
             ) {
                 Text("Save")
+            }
+
+            Text(
+                text = "Backup",
+                style = MaterialTheme.typography.labelLarge,
+                color = wallet.muted,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = wallet.muted)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { exportLauncher.launch("wallot-backup-${LocalDate.now()}.json") },
+                    enabled = !isBackupBusy,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    border = BorderStroke(1.dp, wallet.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
+                ) { Text("Export") }
+                OutlinedButton(
+                    onClick = { importLauncher.launch(arrayOf("*/*")) },
+                    enabled = !isBackupBusy,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    border = BorderStroke(1.dp, wallet.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
+                ) { Text("Import") }
+            }
+            if (backupMessage != null) {
+                Text(
+                    text = backupMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (backupIsError) MaterialTheme.colorScheme.error else wallet.muted
+                )
             }
 
             OutlinedButton(

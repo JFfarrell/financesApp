@@ -189,18 +189,24 @@ The data model supports merchants and tags, and the sheet now exposes both.
 ---
 
 ### 16. Real Room Migrations
-**Status:** To do
+**Status:** Done (needs a first real migration to exercise it)
 
 `fallbackToDestructiveMigration()` wipes every table on any version bump. Before the app holds real data, replace it with explicit `Migration` objects, tested with `MigrationTestHelper` against the schema files in `app/schemas/` (keep every shipped version's file).
+
+Done: version 9 is the baseline, the destructive fallback is removed (a missing migration now fails loudly), and `MigrationTest` plus the schema-asset setup are in place. The procedure is in `CLAUDE.md` ("DB changes"). The test scaffold has not been run yet: `./gradlew connectedDebugAndroidTest` on a device or emulator.
 
 **Complexity:** Small per migration; a habit change more than a feature.
 
 ---
 
 ### 17. Backup and Restore
-**Status:** To do
+**Status:** Done (needs on-device check)
 
 A lossless, versioned export of all data (transactions, categories, merchants, savings goal) as JSON or CSV, saved to a location the user picks (Storage Access Framework), plus an Import that merges it back. Ids are UUIDs and inserts use REPLACE, so re-importing the same file is safe. The spreadsheet export (item 4) is a report layered on the same data, not a substitute for this.
+
+Import matches categories (by type and name) and merchants (by name) against existing ones, so restoring onto a fresh install does not duplicate the seeded default categories.
+
+Done: Export and Import in the Settings sheet (`BackupRepository`, `BackupDao`, `BackupFile`). The file holds transactions, categories, merchants, the savings goal and the pay-cycle day, and is validated before anything is written; import is all-or-nothing and never deletes. Settings shows the last backup time. Possible later additions: a periodic reminder if the last backup is old, scheduled automatic exports to a chosen folder, and an option to restore by replacing everything rather than merging.
 
 **Complexity:** Medium.
 
@@ -214,9 +220,11 @@ Auto Backup was already on (`allowBackup="true"`). Added explicit `backup_rules.
 ---
 
 ### 19. Password Hashing
-**Status:** To do
+**Status:** Done (needs on-device check)
 
 `PasswordHasher` uses an unsalted SHA-256, which is weak against guessing for short passwords. Replace with a salted, slow key-derivation function (e.g. PBKDF2, or Argon2/bcrypt via a library), with a per-user salt and a stored parameter version so existing hashes can be upgraded on next login. Consider splitting the pay-cycle setting into its own DataStore so backup rules can treat the two separately.
+
+Done: `PasswordHasher` uses PBKDF2-HMAC-SHA256 with a random salt and 600,000 iterations, with the parameters stored in the hash string so they can be raised later. Existing passwords keep working: the old unsalted hash is still accepted and is replaced with a new one on the next successful login. `PasswordHasherTest` covers it (`./gradlew :app:testDebugUnitTest`). Not done: the pay-cycle setting still shares the `auth_prefs` store, so it is excluded from cloud backup along with the hash.
 
 **Complexity:** Small-Medium.
 
