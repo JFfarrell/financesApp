@@ -33,11 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.personalfinances.ui.component.ExpenseListItem
-import com.example.personalfinances.ui.component.IncomeListItem
+import com.example.personalfinances.domain.model.Transaction
+import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.ui.component.MonthSelector
-import com.example.personalfinances.ui.screen.expenses.AddExpenseBottomSheet
-import com.example.personalfinances.ui.screen.income.AddIncomeBottomSheet
+import com.example.personalfinances.ui.component.TransactionListItem
+import com.example.personalfinances.ui.screen.transaction.AddTransactionBottomSheet
 import com.example.personalfinances.util.DateUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,7 +45,7 @@ import com.example.personalfinances.util.DateUtils
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val defaultDateMillis = DateUtils.monthBounds(uiState.selectedMonth, uiState.payCycleStartDay).first
+    val defaultDate = DateUtils.monthDateRange(uiState.selectedMonth, uiState.payCycleStartDay).first
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Calendar") }) }
@@ -70,14 +70,25 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = { viewModel.onEvent(CalendarEvent.ShowAddExpenseSheet) },
+                    onClick = {
+                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.EXPENSE))
+                    },
                     modifier = Modifier.weight(1f)
-                ) { Text("+ Add Expense") }
+                ) { Text("+ Expense") }
 
                 OutlinedButton(
-                    onClick = { viewModel.onEvent(CalendarEvent.ShowAddIncomeSheet) },
+                    onClick = {
+                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.INCOME))
+                    },
                     modifier = Modifier.weight(1f)
-                ) { Text("+ Add Income") }
+                ) { Text("+ Income") }
+
+                OutlinedButton(
+                    onClick = {
+                        viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.SAVING))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("+ Savings") }
             }
 
             HorizontalDivider()
@@ -87,7 +98,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     uiState.isLoading -> CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center)
                     )
-                    uiState.expenses.isEmpty() && uiState.recurringExpenses.isEmpty() && uiState.incomes.isEmpty() ->
+                    uiState.transactions.isEmpty() && uiState.recurringTransactions.isEmpty() ->
                         Text(
                             text = "No transactions for this month.",
                             modifier = Modifier
@@ -96,45 +107,25 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         )
                     else -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            if (uiState.expenses.isNotEmpty() || uiState.recurringExpenses.isNotEmpty()) {
-                                item {
-                                    SectionHeader("Expenses")
-                                }
-                                items(uiState.expenses, key = { "e_${it.id}" }) { expense ->
-                                    SwipeToDeleteBox(onDelete = {
-                                        viewModel.onEvent(CalendarEvent.DeleteExpense(expense))
-                                    }) {
-                                        ExpenseListItem(
-                                            expense = expense,
-                                            onClick = { viewModel.onEvent(CalendarEvent.ShowEditExpenseSheet(expense)) }
-                                        )
+                            // One section per transaction type: one-off entries first, then a
+                            // "Recurring" sub-section.
+                            TransactionType.entries.forEach { type ->
+                                val oneOff = uiState.transactions.filter { it.transactionType == type }
+                                val recurring = uiState.recurringTransactions.filter { it.transactionType == type }
+                                if (oneOff.isNotEmpty() || recurring.isNotEmpty()) {
+                                    item(key = "header_${type.name}") {
+                                        SectionHeader(sectionTitle(type))
                                     }
-                                }
-                                if (uiState.recurringExpenses.isNotEmpty()) {
-                                    item { SubSectionHeader("Recurring") }
-                                    items(uiState.recurringExpenses, key = { "er_${it.id}" }) { expense ->
-                                        SwipeToDeleteBox(onDelete = {
-                                            viewModel.onEvent(CalendarEvent.DeleteExpense(expense))
-                                        }) {
-                                            ExpenseListItem(
-                                                expense = expense,
-                                                onClick = { viewModel.onEvent(CalendarEvent.ShowEditExpenseSheet(expense)) }
-                                            )
+                                    items(oneOff, key = { it.id }) { transaction ->
+                                        TransactionRow(transaction, viewModel::onEvent)
+                                    }
+                                    if (recurring.isNotEmpty()) {
+                                        item(key = "recurring_${type.name}") {
+                                            SubSectionHeader("Recurring")
                                         }
-                                    }
-                                }
-                            }
-
-                            if (uiState.incomes.isNotEmpty()) {
-                                item { SectionHeader("Income") }
-                                items(uiState.incomes, key = { "i_${it.id}" }) { income ->
-                                    SwipeToDeleteBox(onDelete = {
-                                        viewModel.onEvent(CalendarEvent.DeleteIncome(income))
-                                    }) {
-                                        IncomeListItem(
-                                            income = income,
-                                            onClick = { viewModel.onEvent(CalendarEvent.ShowEditIncomeSheet(income)) }
-                                        )
+                                        items(recurring, key = { it.id }) { transaction ->
+                                            TransactionRow(transaction, viewModel::onEvent)
+                                        }
                                     }
                                 }
                             }
@@ -145,70 +136,63 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         }
     }
 
-    if (uiState.isExpenseSheetOpen) {
-        AddExpenseBottomSheet(
-            initialExpense = uiState.expenseSheetTarget,
-            defaultDateMillis = defaultDateMillis,
-            onDismiss = { viewModel.onEvent(CalendarEvent.HideExpenseSheet) },
-            onSave = { expense, durationMonths ->
-                val event = if (uiState.expenseSheetTarget == null)
-                    CalendarEvent.AddExpense(expense, durationMonths)
+    if (uiState.isTransactionSheetOpen) {
+        AddTransactionBottomSheet(
+            initialTransaction = uiState.transactionSheetTarget,
+            defaultType = uiState.sheetDefaultType,
+            defaultDate = defaultDate,
+            categories = uiState.categories,
+            onCreateCategory = { viewModel.onEvent(CalendarEvent.AddCategory(it)) },
+            onDismiss = { viewModel.onEvent(CalendarEvent.HideTransactionSheet) },
+            onSave = { transaction, durationMonths ->
+                val event = if (uiState.transactionSheetTarget == null)
+                    CalendarEvent.AddTransaction(transaction, durationMonths)
                 else
-                    CalendarEvent.UpdateExpense(expense)
-                viewModel.onEvent(event)
-            }
-        )
-    }
-
-    if (uiState.isIncomeSheetOpen) {
-        AddIncomeBottomSheet(
-            initialIncome = uiState.incomeSheetTarget,
-            defaultDateMillis = defaultDateMillis,
-            onDismiss = { viewModel.onEvent(CalendarEvent.HideIncomeSheet) },
-            onSave = { income, durationMonths ->
-                val event = if (uiState.incomeSheetTarget == null)
-                    CalendarEvent.AddIncome(income, durationMonths)
-                else
-                    CalendarEvent.UpdateIncome(income)
+                    CalendarEvent.UpdateTransaction(transaction)
                 viewModel.onEvent(event)
             }
         )
     }
 
     when (val dialog = uiState.recurringDialog) {
-        is RecurringDialogState.PendingDeleteExpense ->
+        is RecurringDialogState.PendingDelete ->
             RecurringActionDialog(
-                title = "Delete recurring expense",
+                title = "Delete recurring transaction",
                 onConfirm = { scope ->
-                    viewModel.onEvent(CalendarEvent.ConfirmDeleteExpense(dialog.expense, scope))
+                    viewModel.onEvent(CalendarEvent.ConfirmDelete(dialog.transaction, scope))
                 },
                 onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
             )
-        is RecurringDialogState.PendingDeleteIncome ->
+        is RecurringDialogState.PendingUpdate ->
             RecurringActionDialog(
-                title = "Delete recurring income",
+                title = "Edit recurring transaction",
                 onConfirm = { scope ->
-                    viewModel.onEvent(CalendarEvent.ConfirmDeleteIncome(dialog.income, scope))
-                },
-                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
-            )
-        is RecurringDialogState.PendingUpdateExpense ->
-            RecurringActionDialog(
-                title = "Edit recurring expense",
-                onConfirm = { scope ->
-                    viewModel.onEvent(CalendarEvent.ConfirmUpdateExpense(dialog.updated, scope))
-                },
-                onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
-            )
-        is RecurringDialogState.PendingUpdateIncome ->
-            RecurringActionDialog(
-                title = "Edit recurring income",
-                onConfirm = { scope ->
-                    viewModel.onEvent(CalendarEvent.ConfirmUpdateIncome(dialog.updated, scope))
+                    viewModel.onEvent(CalendarEvent.ConfirmUpdate(dialog.updated, scope))
                 },
                 onDismiss = { viewModel.onEvent(CalendarEvent.DismissRecurringDialog) }
             )
         RecurringDialogState.None -> Unit
+    }
+}
+
+/** Section title shown above each transaction type's entries. */
+private fun sectionTitle(type: TransactionType): String = when (type) {
+    TransactionType.EXPENSE -> "Expenses"
+    TransactionType.INCOME -> "Income"
+    TransactionType.SAVING -> "Savings"
+}
+
+/** A transaction row with swipe-to-delete; tapping opens the edit sheet. */
+@Composable
+private fun TransactionRow(
+    transaction: Transaction,
+    onEvent: (CalendarEvent) -> Unit
+) {
+    SwipeToDeleteBox(onDelete = { onEvent(CalendarEvent.DeleteTransaction(transaction)) }) {
+        TransactionListItem(
+            transaction = transaction,
+            onClick = { onEvent(CalendarEvent.ShowEditTransactionSheet(transaction)) }
+        )
     }
 }
 

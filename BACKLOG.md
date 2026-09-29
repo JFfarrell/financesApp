@@ -17,9 +17,9 @@ Replaced the free-text `source` field with a fixed `IncomeType` enum (Salary, St
 ### 2. Annual Overview
 **Status:** To do
 
-New screen showing a scrollable grid — rows = income/expense types, columns = Jan–Dec + Total + Average. Two sections: Income and Expenses. Year navigation. New DAO queries aggregating by type and month for a full year.
+New screen showing a scrollable grid — rows = categories (grouped by transaction type), columns = Jan–Dec + Total + Average. Sections: Income, Expenses and Savings. Year navigation. New DAO queries aggregating by category and month for a full year.
 
-**Complexity:** Medium-Large — custom grid layout, non-trivial queries. No schema changes. Best done after items 1 and 3.
+**Complexity:** Medium-Large — custom grid layout, non-trivial queries. No schema changes. Written against the old Expense/Income model; now builds on `TransactionDao` and categories.
 
 ---
 
@@ -33,7 +33,7 @@ Replaced the flat user-managed `categories` system with a two-level predefined h
 ### 4. Export
 **Status:** To do
 
-Export action (from Dashboard or a menu) that generates a CSV mirroring the spreadsheet: income by type across months, expenses by type across months, totals. Delivered via Android `FileProvider` + share intent. No schema changes.
+Export action (from Dashboard or a menu) that generates a CSV mirroring the spreadsheet: income, expenses and savings by category across months, totals. This is a report, not a backup: the monthly grid loses dates, merchants and tags (see the backup and restore discussion). Delivered via Android `FileProvider` + share intent. No schema changes.
 
 **Complexity:** Medium — self-contained, no schema changes. Best done last.
 
@@ -120,17 +120,27 @@ See memory for full agreed data model spec.
 - [x] `CalendarViewModel` (in `MonthlyViewModel.kt`) — migrate from `Expense`/`Income` to `Transaction`; state, events and dialog collapsed to one transaction path. Its screen and sheets won't compile until Layer 4
 - [x] `SavingsViewModel` — switched to the transaction `GetSavingsTotalUseCase`
 
+#### Layer 2b — Category & merchant plumbing (needed by the new UI)
+- [x] `CategoryRepository` + `MerchantRepository` interfaces and implementations, bound in `RepositoryModule`
+- [x] `GetCategoriesUseCase`, `AddCategoryUseCase`, `GetMerchantsUseCase`, `AddMerchantUseCase`
+- [x] Seed default categories via `RoomDatabase.Callback` in `DatabaseModule`
+- [x] Categories scoped by transaction type (`Category.type`, DB v8): separate expense, income and savings lists, seeded per type; the sheet filters the picker by the selected type
+- [ ] Optionally enforce `category.type == transactionType` in the add/update use cases (currently only the sheet keeps them consistent)
+- [x] `CalendarViewModel` exposes `categories` and `merchants`, with `AddCategory` / `AddMerchant` events
+
 #### Layer 4 — UI
 - [ ] Remove `HierarchicalTypeField` component
-- [ ] New single category picker (searchable, create-new inline)
-- [ ] Tag input UI (add/remove tags, searchable existing tags)
-- [ ] Merchant input (searchable, create-new inline)
-- [ ] Unified `TransactionListItem` replacing `ExpenseListItem` + `IncomeListItem`
-- [ ] `AddTransactionBottomSheet` replacing `AddExpenseBottomSheet` + `AddIncomeBottomSheet`
+- [x] New single category picker (dropdown with create-new inline; not searchable yet)
+- [ ] Tag input UI (add/remove tags, searchable existing tags) — sheet currently preserves tags on edit but does not expose them
+- [ ] Merchant input (searchable, create-new inline) — sheet currently preserves the merchant on edit but does not expose it
+- [x] Unified `TransactionListItem` replacing `ExpenseListItem` + `IncomeListItem`
+- [x] `AddTransactionBottomSheet` replacing `AddExpenseBottomSheet` + `AddIncomeBottomSheet` (trimmed: type, amount, category, date, notes, recurring)
+- [x] `MonthlyScreen` (`CalendarScreen`) migrated to the unified state, events and sheet
 
 #### Cleanup (after all layers done)
-- [ ] Delete legacy files: `Expense`, `Income`, `ExpenseType`, `ExpenseCategory`, `IncomeType`, `LegacyTransactionType`
-- [ ] Delete legacy entities, DAOs, mappers
+- [x] Delete legacy files: `Expense`, `Income`, `ExpenseType`, `ExpenseCategory`, `IncomeType`, `LegacyTransactionType`
+- [x] Delete legacy entities, DAOs, mappers, repositories, use cases and UI; `SavingsGoalEntity` and `SavingsGoalMapper` moved out of `legacy/`; `DatabaseModule`, `RepositoryModule` and `AppDatabase` updated (DB v9); `DateUtils` reduced to `monthDateRange`
+- [ ] Verify by building and running, then set item 11's status to Done
 
 ---
 

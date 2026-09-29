@@ -86,7 +86,7 @@ class TransactionRepositoryImpl @Inject constructor(
         return transactionDao.getLastTransactionDate()
     }
 
-    override suspend fun insert(transaction: Transaction) {
+    override suspend fun add(transaction: Transaction) {
         transactionDao.insertTransaction(transaction.toEntity())
     }
 

@@ -6,34 +6,29 @@ Pure Kotlin. No Android, Room, or Hilt imports anywhere in this layer.
 graph TD
 
     subgraph Models["Domain Models"]
-        Transaction["Transaction - new"]
-        Transaction ~~~ Category["Category - new"]
-        Category ~~~ Merchant["Merchant - new"]
-        Merchant ~~~ Expense["Expense - legacy"]
-        Expense ~~~ Income["Income - legacy"]
-        Income ~~~ SavingsGoal["SavingsGoal"]
+        Transaction["Transaction"]
+        Transaction ~~~ Category["Category"]
+        Category ~~~ Merchant["Merchant"]
+        Merchant ~~~ SavingsGoal["SavingsGoal"]
     end
 
     subgraph Enums["Enums"]
-        TransactionType["TransactionType - new"]
-        TransactionType ~~~ CadenceUnit["CadenceUnit - new"]
-        CadenceUnit ~~~ ExpenseType["ExpenseType - legacy"]
-        ExpenseType ~~~ IncomeType["IncomeType - legacy"]
+        TransactionType["TransactionType"]
+        TransactionType ~~~ CadenceUnit["CadenceUnit"]
     end
 
     subgraph Interfaces["Repository Interfaces"]
-        TR["TransactionRepository - new"]
-        TR ~~~ ER["ExpenseRepository - legacy"]
-        ER ~~~ IR["IncomeRepository - legacy"]
-        IR ~~~ SGR["SavingsGoalRepository"]
+        TR["TransactionRepository"]
+        TR ~~~ CR["CategoryRepository"]
+        CR ~~~ MR["MerchantRepository"]
+        MR ~~~ SGR["SavingsGoalRepository"]
         SGR ~~~ SR["SettingsRepository"]
     end
 
     subgraph UseCases["Use Cases"]
-        TUC["Transaction Use Cases - new"]
-        TUC ~~~ EUC["Expense Use Cases - legacy"]
-        EUC ~~~ IUC["Income Use Cases - legacy"]
-        IUC ~~~ SUC["Savings Use Cases"]
+        TUC["Transaction Use Cases"]
+        TUC ~~~ CUC["Category and Merchant Use Cases"]
+        CUC ~~~ SUC["Savings Use Cases"]
         SUC ~~~ STUC["Settings Use Cases"]
     end
 
@@ -41,18 +36,18 @@ graph TD
     Transaction --> CadenceUnit
     Transaction --> Category
     Transaction --> Merchant
-    Expense --> ExpenseType
+    Category --> TransactionType
 
     TUC --> TR
-    EUC --> ER
-    IUC --> IR
+    CUC --> CR
+    CUC --> MR
     SUC --> SGR
     STUC --> SR
 
     TR ~~~ Transaction
 ```
 
-## Legend
+## Notes
 
-- new: Part of the new unified Transaction model
-- legacy: To be deleted after migration is complete
+- Each `Category` belongs to one `TransactionType`, so expense, income and savings each have their own category list.
+- Savings is a `TransactionType`, not a separate model. The savings goal itself (`SavingsGoal`) holds only a target and a starting amount; the current total is derived from SAVING transactions.

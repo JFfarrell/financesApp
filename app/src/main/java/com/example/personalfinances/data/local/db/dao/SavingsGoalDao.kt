@@ -4,7 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.personalfinances.data.local.db.entity.legacy.SavingsGoalEntity
+import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

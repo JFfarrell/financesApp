@@ -2,9 +2,15 @@ package com.example.personalfinances.ui.screen.monthly
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.personalfinances.domain.model.Category
+import com.example.personalfinances.domain.model.Merchant
 import com.example.personalfinances.domain.model.Transaction
 import com.example.personalfinances.domain.model.enums.CadenceUnit
 import com.example.personalfinances.domain.model.enums.TransactionType
+import com.example.personalfinances.domain.usecase.category.AddCategoryUseCase
+import com.example.personalfinances.domain.usecase.category.GetCategoriesUseCase
+import com.example.personalfinances.domain.usecase.merchant.AddMerchantUseCase
+import com.example.personalfinances.domain.usecase.merchant.GetMerchantsUseCase
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.domain.usecase.transaction.AddTransactionUseCase
 import com.example.personalfinances.domain.usecase.transaction.DeleteTransactionSeriesUseCase
@@ -45,6 +51,8 @@ sealed class RecurringDialogState {
  * [transactionSheetTarget] is null when the sheet is in Add mode, or holds the transaction being
  * edited. In Add mode, [sheetDefaultType] is the type the sheet should pre-select.
  *
+ * [categories] and [merchants] feed the pickers in the transaction sheet.
+ *
  * [recurringDialog] is non-None when a recurring-scope prompt is waiting for user input.
  */
 data class CalendarUiState(
@@ -56,6 +64,8 @@ data class CalendarUiState(
     val isTransactionSheetOpen: Boolean = false,
     val transactionSheetTarget: Transaction? = null,
     val sheetDefaultType: TransactionType = TransactionType.EXPENSE,
+    val categories: List<Category> = emptyList(),
+    val merchants: List<Merchant> = emptyList(),
     val recurringDialog: RecurringDialogState = RecurringDialogState.None
 )
 
@@ -73,6 +83,10 @@ sealed class CalendarEvent {
     data class ShowAddTransactionSheet(val type: TransactionType) : CalendarEvent()
     data class ShowEditTransactionSheet(val transaction: Transaction) : CalendarEvent()
     object HideTransactionSheet : CalendarEvent()
+
+    /** Saves a category created inline in the sheet. The sheet supplies the id so it can select it. */
+    data class AddCategory(val category: Category) : CalendarEvent()
+    data class AddMerchant(val merchant: Merchant) : CalendarEvent()
 
     data class ConfirmDelete(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
     data class ConfirmUpdate(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
@@ -97,7 +111,11 @@ class CalendarViewModel @Inject constructor(
     private val updateTransactionSeriesUseCase: UpdateTransactionSeriesUseCase,
     private val deleteTransactionUseCase: DeleteTransactionUseCase,
     private val deleteTransactionSeriesUseCase: DeleteTransactionSeriesUseCase,
-    private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase
+    private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase,
+    private val getCategoriesUseCase: GetCategoriesUseCase,
+    private val addCategoryUseCase: AddCategoryUseCase,
+    private val getMerchantsUseCase: GetMerchantsUseCase,
+    private val addMerchantUseCase: AddMerchantUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -109,6 +127,14 @@ class CalendarViewModel @Inject constructor(
         getPayCycleStartDayUseCase().onEach { startDay ->
             _uiState.update { it.copy(payCycleStartDay = startDay) }
             loadMonth(_uiState.value.selectedMonth)
+        }.launchIn(viewModelScope)
+
+        getCategoriesUseCase().onEach { categories ->
+            _uiState.update { it.copy(categories = categories) }
+        }.launchIn(viewModelScope)
+
+        getMerchantsUseCase().onEach { merchants ->
+            _uiState.update { it.copy(merchants = merchants) }
         }.launchIn(viewModelScope)
     }
 
@@ -230,6 +256,11 @@ class CalendarViewModel @Inject constructor(
                 }
             CalendarEvent.HideTransactionSheet ->
                 _uiState.update { it.copy(isTransactionSheetOpen = false, transactionSheetTarget = null) }
+
+            is CalendarEvent.AddCategory ->
+                viewModelScope.launch { addCategoryUseCase(event.category) }
+            is CalendarEvent.AddMerchant ->
+                viewModelScope.launch { addMerchantUseCase(event.merchant) }
 
             CalendarEvent.DismissRecurringDialog ->
                 _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }

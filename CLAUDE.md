@@ -11,17 +11,20 @@ Android personal finance tracker built with Jetpack Compose, Room, Hilt, and Kot
 - **Navigation:** `ui/navigation/NavGraph.kt` + `AppDestination.kt`
 
 ## Key Patterns
-- **Adding a new entity:** Follow the existing category pattern — entity → DAO → mapper → domain model → repository interface + impl → use cases → ViewModel state + events → UI. Register the DAO in `DatabaseModule` and bind the repository in `RepositoryModule`.
-- **Reactive data:** All data flows through Kotlin `Flow`. Use `combine()` in ViewModels when a screen needs multiple data sources (see `CalendarViewModel` which combines expenses + income).
-- **Hierarchical type picker:** See `HierarchicalTypeField.kt` — two-step `ExposedDropdownMenuBox` (category → subtype). See `AddExpenseBottomSheet.kt` for usage. Mirror this for any new two-level picker.
+- **Adding a new entity:** Follow the existing category pattern — entity → DAO → mapper → domain model → repository interface + impl → use cases → ViewModel state + events → UI. Add the entity to `AppDatabase`, provide the DAO in `DatabaseModule` and bind the repository in `RepositoryModule`.
+- **Unified transaction model:** Expenses, income and savings are all `Transaction`s distinguished by `TransactionType` (EXPENSE, INCOME, SAVING). Categories are user-defined entities scoped to one type; merchants are optional entities; tags are a `Set<String>` stored as JSON. `TransactionRepositoryImpl` resolves category and merchant ids into full objects before mapping to the domain model.
+- **Reactive data:** All data flows through Kotlin `Flow`. Use `combine()` in ViewModels when a screen needs multiple data sources (see `SavingsViewModel`, which combines the savings goal with the savings total).
+- **Category picker:** `AddTransactionBottomSheet.kt` uses an `ExposedDropdownMenuBox` listing only the categories for the selected transaction type, with an inline "+ New category" option. Reuse that pattern for merchants.
+- **Dates:** Domain and entities use `LocalDate`; the `Converters` class (registered on `AppDatabase`) stores it as epoch millis, so mappers and repositories never convert manually. `DateUtils.monthDateRange` builds the inclusive date range for a month, honouring the user's pay-cycle start day.
 - **Keyboard / IME handling:** `enableEdgeToEdge()` is called in `MainActivity` so the system reports IME insets. Screens that use `Scaffold` get this for free via `innerPadding`. Screens without a `Scaffold` (e.g. `LoginScreen`) need `Modifier.systemBarsPadding().imePadding()` on their root. `ModalBottomSheet` content needs `.imePadding()` on its Column, placed before `verticalScroll()` so the keyboard pushes content up and the user can scroll to any field.
 - **DB changes:** Bump `version` in `AppDatabase.kt`. `fallbackToDestructiveMigration()` is set — no migration SQL needed during development, but existing data will be wiped on upgrade.
-- **Pre-populating data:** Add a `RoomDatabase.Callback` in `DatabaseModule` and insert seed rows in `onCreate`.
+- **Pre-populating data:** `DatabaseModule` already seeds default categories (per transaction type) in a `RoomDatabase.Callback`. Add further seed rows there with raw SQL in `onCreate`.
 
 ## Database
 - Room SQLite, database name: `personal_finances.db`
-- Entities: `ExpenseEntity`, `IncomeEntity`, `SavingsGoalEntity`
-- Current version: 6 (full history in `AppDatabase.kt`)
+- Entities: `TransactionEntity`, `CategoryEntity`, `MerchantEntity`, `SavingsGoalEntity`
+- Current version: 9 (full history in `AppDatabase.kt`)
+- `fallbackToDestructiveMigration()` wipes all tables on any version bump; real migrations are needed before the app holds real data (see `BACKLOG.md`)
 
 ## Code Style
 - Add KDoc docstrings to all classes and functions — including composables, ViewModels, use cases, DAOs, repositories, and mappers. Briefly explain what each does and, where non-obvious, why.
@@ -40,8 +43,8 @@ Keep all documentation in sync with the current state of the codebase at all tim
 
 ## Testing
 No automated tests currently exist. Verify changes manually by building and running the app on an emulator or device. Key flows to check after any change:
-- Add / delete an expense (one-off and recurring series)
-- Add / delete an income entry (one-off and recurring series)
+- Add / edit / delete a transaction of each type: expense, income and savings (one-off and recurring series)
+- Create a category inline from the add sheet; the picker only shows categories for the selected type
 - Calendar month navigation loads correct transactions
-- Home screen summary updates correctly
+- Home screen summary and the Savings screen total update correctly
 - Existing data is unaffected by schema changes (or wipe is expected and noted)

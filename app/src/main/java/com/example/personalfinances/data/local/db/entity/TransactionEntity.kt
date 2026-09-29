@@ -25,7 +25,12 @@ import java.time.LocalDate
             onDelete = RESTRICT
         )
     ],
-    indices = [Index("date"), Index("transaction_type")]
+    indices = [
+        Index("date"),
+        Index("transaction_type"),
+        Index("category_id"),
+        Index("merchant_id")
+    ]
 )
 data class TransactionEntity(
     @PrimaryKey val id: String,

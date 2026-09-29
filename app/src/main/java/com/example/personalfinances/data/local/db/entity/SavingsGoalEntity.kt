@@ -1,4 +1,4 @@
-package com.example.personalfinances.data.local.db.entity.legacy
+package com.example.personalfinances.data.local.db.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
