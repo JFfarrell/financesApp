@@ -116,9 +116,9 @@ See memory for full agreed data model spec.
 - [x] `GetSavingsTotalUseCase` (rewritten to filter by `transactionType == SAVING`)
 
 #### Layer 3 — ViewModels
-- [ ] `DashboardViewModel` — rewrite analytics to group by `category.name` instead of `ExpenseType.displayName`
-- [ ] `CalendarViewModel` — migrate from `Expense`/`Income` to `Transaction`
-- [ ] `SavingsViewModel` — update to use new savings use case
+- [x] `DashboardViewModel` — rewrite analytics to group by `category.name` instead of `ExpenseType.displayName`
+- [x] `CalendarViewModel` (in `MonthlyViewModel.kt`) — migrate from `Expense`/`Income` to `Transaction`; state, events and dialog collapsed to one transaction path. Its screen and sheets won't compile until Layer 4
+- [x] `SavingsViewModel` — switched to the transaction `GetSavingsTotalUseCase`
 
 #### Layer 4 — UI
 - [ ] Remove `HierarchicalTypeField` component
@@ -151,7 +151,7 @@ Repository-layer helpers for working with date ranges and transaction history bo
 ### 13. Review Series Update Cadence Behaviour
 **Status:** To do
 
-When `updateTransactionSeriesFromDate` is called, it currently updates `cadence_unit` and `cadence_value` across all future instances in the series. Consider whether changing the cadence mid-series is a valid user action, and if so whether it should apply to all future instances or only from the edited entry onwards. May require a separate DAO query or UI confirmation dialog.
+When `updateTransactionSeriesFromDate` is called, it currently updates `cadence_unit` and `cadence_value` across all future instances in the series. Consider whether changing the cadence mid-series is a valid user action, and if so whether it should apply to all future instances or only from the edited entry onwards. May require a separate DAO query or UI confirmation dialog. Related: `CalendarEvent.ConfirmUpdate` with THIS_AND_FUTURE uses the edited transaction's own date as the cutoff, so changing the date while editing a series entry also moves the cutoff.
 
 **Complexity:** Low-Medium — design decision first, then a small DAO/use case change.
 

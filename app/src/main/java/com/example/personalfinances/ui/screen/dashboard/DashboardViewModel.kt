@@ -2,35 +2,35 @@ package com.example.personalfinances.ui.screen.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.personalfinances.domain.usecase.expense.GetExpensesByMonthUseCase
-import com.example.personalfinances.domain.usecase.income.GetIncomesUseCase
+import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.domain.usecase.settings.SetPayCycleStartDayUseCase
+import com.example.personalfinances.domain.usecase.transaction.GetTransactionsByMonthUseCase
 import com.example.personalfinances.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 
 /**
  * Holds all UI state for the Dashboard screen.
  *
- * Loads income and expense data for the selected month reactively. When the user navigates
- * between months, the previous month's collection job is cancelled and a new one started,
- * preventing stale data from leaking across navigations.
+ * Loads income and expense (including savings) data for the selected month reactively.
+ * When the user navigates between months, the previous month's collection job is
+ * cancelled and a new one started, preventing stale data from leaking across navigations.
  */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val getExpensesByMonthUseCase: GetExpensesByMonthUseCase,
-    private val getIncomesUseCase: GetIncomesUseCase,
+    private val getTransactionsByMonthUseCase: GetTransactionsByMonthUseCase,
     private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase,
     private val setPayCycleStartDayUseCase: SetPayCycleStartDayUseCase
 ) : ViewModel() {
@@ -52,29 +52,35 @@ class DashboardViewModel @Inject constructor(
         monthJob?.cancel()
         _uiState.update { it.copy(isLoading = true, selectedMonth = month) }
         monthJob = viewModelScope.launch {
-            val (start, end) = DateUtils.monthBounds(month, startDay)
-            combine(
-                getExpensesByMonthUseCase(start, end),
-                getIncomesUseCase(start, end)
-            ) { expenses, incomes ->
-                val totalExpenses = expenses.sumOf { it.amount }
-                val totalIncome = incomes.sumOf { it.amount }
-                // Group expenses by their type's display name (e.g. "Fuel / Petrol") now that
-                // categories are replaced by the predefined ExpenseType enum.
-                val byCategory = expenses
-                    .groupBy { it.type.displayName }
-                    .mapValues { (_, list) -> list.sumOf { it.amount } }
-                Triple(totalExpenses, totalIncome, byCategory)
-            }.collect { (totalExpenses, totalIncome, byCategory) ->
-                _uiState.update {
-                    it.copy(
-                        totalExpenses = totalExpenses,
-                        totalIncome = totalIncome,
-                        remainder = totalIncome - totalExpenses,
-                        expensesByCategory = byCategory,
-                        isLoading = false
-                    )
-                }
+            val (start, end) = DateUtils.monthDateRange(month, startDay)
+            summariseMonth(start, end)
+        }
+    }
+
+    /**
+     *  Split the single transaction list into income and spending.
+     * Savings count as spending (as they did when they were an expense type)
+     * so the remainder is unchanged.
+     */
+    private suspend fun summariseMonth(start: LocalDate, end: LocalDate) {
+        getTransactionsByMonthUseCase(start, end).map { transactions ->
+            val income = transactions.filter { it.transactionType == TransactionType.INCOME }
+            val spending = transactions.filter { it.transactionType != TransactionType.INCOME }
+            val totalIncome = income.sumOf { it.amount }
+            val totalExpenses = spending.sumOf { it.amount }
+            val byCategory = spending
+                .groupBy { it.category.name }
+                .mapValues { (_, list) -> list.sumOf { it.amount } }
+            Triple(totalExpenses, totalIncome, byCategory)
+        }.collect { (totalExpenses, totalIncome, byCategory) ->
+            _uiState.update {
+                it.copy(
+                    totalExpenses = totalExpenses,
+                    totalIncome = totalIncome,
+                    remainder = totalIncome - totalExpenses,
+                    expensesByCategory = byCategory,
+                    isLoading = false
+                )
             }
         }
     }
@@ -99,8 +105,8 @@ class DashboardViewModel @Inject constructor(
 /**
  * Immutable snapshot of the Dashboard screen's UI state.
  *
- * [expensesByCategory] maps each [com.example.personalfinances.domain.model.ExpenseType.displayName]
- * to the total amount spent under that type for the selected month.
+ * [expensesByCategory] maps each category name to the total spent under that category
+ * (savings included) for the selected month.
  */
 data class DashboardUiState(
     val selectedMonth: YearMonth = YearMonth.now(),

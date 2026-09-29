@@ -2,66 +2,60 @@ package com.example.personalfinances.ui.screen.monthly
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.personalfinances.domain.model.Expense
-import com.example.personalfinances.domain.model.Income
-import com.example.personalfinances.domain.usecase.expense.AddExpenseUseCase
-import com.example.personalfinances.domain.usecase.expense.DeleteExpenseSeriesUseCase
-import com.example.personalfinances.domain.usecase.expense.DeleteExpenseUseCase
-import com.example.personalfinances.domain.usecase.expense.GetExpensesByMonthUseCase
-import com.example.personalfinances.domain.usecase.expense.UpdateExpenseSeriesUseCase
-import com.example.personalfinances.domain.usecase.expense.UpdateExpenseUseCase
-import com.example.personalfinances.domain.usecase.income.AddIncomeUseCase
-import com.example.personalfinances.domain.usecase.income.DeleteIncomeSeriesUseCase
-import com.example.personalfinances.domain.usecase.income.DeleteIncomeUseCase
-import com.example.personalfinances.domain.usecase.income.GetIncomesUseCase
-import com.example.personalfinances.domain.usecase.income.UpdateIncomeSeriesUseCase
-import com.example.personalfinances.domain.usecase.income.UpdateIncomeUseCase
+import com.example.personalfinances.domain.model.Transaction
+import com.example.personalfinances.domain.model.enums.CadenceUnit
+import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
+import com.example.personalfinances.domain.usecase.transaction.AddTransactionUseCase
+import com.example.personalfinances.domain.usecase.transaction.DeleteTransactionSeriesUseCase
+import com.example.personalfinances.domain.usecase.transaction.DeleteTransactionUseCase
+import com.example.personalfinances.domain.usecase.transaction.GetTransactionsByMonthUseCase
+import com.example.personalfinances.domain.usecase.transaction.UpdateTransactionSeriesUseCase
+import com.example.personalfinances.domain.usecase.transaction.UpdateTransactionUseCase
 import com.example.personalfinances.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 
 enum class RecurringScope { THIS_ONLY, THIS_AND_FUTURE }
 
 /** Tracks whether a recurring-scope dialog is waiting for user input and what action it concerns. */
 sealed class RecurringDialogState {
     object None : RecurringDialogState()
-    data class PendingDeleteExpense(val expense: Expense) : RecurringDialogState()
-    data class PendingDeleteIncome(val income: Income) : RecurringDialogState()
-    data class PendingUpdateExpense(val updated: Expense) : RecurringDialogState()
-    data class PendingUpdateIncome(val updated: Income) : RecurringDialogState()
+    data class PendingDelete(val transaction: Transaction) : RecurringDialogState()
+    data class PendingUpdate(val updated: Transaction) : RecurringDialogState()
 }
 
 /**
  * Immutable snapshot of the Calendar screen's UI state.
  *
- * [expenseSheetTarget] is null when the expense sheet is in Add mode, or holds the expense
- * being edited. Same pattern for [incomeSheetTarget].
+ * [transactions] holds the month's one-off transactions of every type; [recurringTransactions]
+ * holds the recurring ones. The screen groups them by [Transaction.transactionType].
+ *
+ * [transactionSheetTarget] is null when the sheet is in Add mode, or holds the transaction being
+ * edited. In Add mode, [sheetDefaultType] is the type the sheet should pre-select.
  *
  * [recurringDialog] is non-None when a recurring-scope prompt is waiting for user input.
  */
 data class CalendarUiState(
     val selectedMonth: YearMonth = YearMonth.now(),
     val payCycleStartDay: Int = 1,
-    val expenses: List<Expense> = emptyList(),
-    val recurringExpenses: List<Expense> = emptyList(),
-    val incomes: List<Income> = emptyList(),
+    val transactions: List<Transaction> = emptyList(),
+    val recurringTransactions: List<Transaction> = emptyList(),
     val isLoading: Boolean = true,
-    val isExpenseSheetOpen: Boolean = false,
-    val expenseSheetTarget: Expense? = null,
-    val isIncomeSheetOpen: Boolean = false,
-    val incomeSheetTarget: Income? = null,
+    val isTransactionSheetOpen: Boolean = false,
+    val transactionSheetTarget: Transaction? = null,
+    val sheetDefaultType: TransactionType = TransactionType.EXPENSE,
     val recurringDialog: RecurringDialogState = RecurringDialogState.None
 )
 
@@ -70,51 +64,39 @@ sealed class CalendarEvent {
     object PreviousMonth : CalendarEvent()
     object NextMonth : CalendarEvent()
 
-    data class AddExpense(val expense: Expense, val durationMonths: Int = 1) : CalendarEvent()
-    data class UpdateExpense(val expense: Expense) : CalendarEvent()
-    data class DeleteExpense(val expense: Expense) : CalendarEvent()
-    object ShowAddExpenseSheet : CalendarEvent()
-    data class ShowEditExpenseSheet(val expense: Expense) : CalendarEvent()
-    object HideExpenseSheet : CalendarEvent()
+    data class AddTransaction(
+        val transaction: Transaction,
+        val durationMonths: Int = 1
+    ) : CalendarEvent()
+    data class UpdateTransaction(val transaction: Transaction) : CalendarEvent()
+    data class DeleteTransaction(val transaction: Transaction) : CalendarEvent()
+    data class ShowAddTransactionSheet(val type: TransactionType) : CalendarEvent()
+    data class ShowEditTransactionSheet(val transaction: Transaction) : CalendarEvent()
+    object HideTransactionSheet : CalendarEvent()
 
-    data class AddIncome(val income: Income, val durationMonths: Int = 1) : CalendarEvent()
-    data class UpdateIncome(val income: Income) : CalendarEvent()
-    data class DeleteIncome(val income: Income) : CalendarEvent()
-    object ShowAddIncomeSheet : CalendarEvent()
-    data class ShowEditIncomeSheet(val income: Income) : CalendarEvent()
-    object HideIncomeSheet : CalendarEvent()
-
-    data class ConfirmDeleteExpense(val expense: Expense, val scope: RecurringScope) : CalendarEvent()
-    data class ConfirmDeleteIncome(val income: Income, val scope: RecurringScope) : CalendarEvent()
-    data class ConfirmUpdateExpense(val expense: Expense, val scope: RecurringScope) : CalendarEvent()
-    data class ConfirmUpdateIncome(val income: Income, val scope: RecurringScope) : CalendarEvent()
+    data class ConfirmDelete(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
+    data class ConfirmUpdate(val transaction: Transaction, val scope: RecurringScope) : CalendarEvent()
     object DismissRecurringDialog : CalendarEvent()
 }
 
 /**
  * Holds all UI state for the Calendar screen and handles user-driven events.
  *
- * Both expense and income flows for the selected month are combined into a single collector so
- * both lists update atomically and [CalendarUiState.isLoading] clears only once both are ready.
+ * A single flow of the month's transactions is split into one-off and recurring lists, so both
+ * update together and [CalendarUiState.isLoading] clears once the data is ready.
  *
- * For recurring entries (those with a [Expense.recurringGroupId]), delete and update operations
- * pause and set [CalendarUiState.recurringDialog] so the UI can ask the user whether to apply the
- * change to just this entry or to this and all future entries in the series.
+ * For recurring entries (those with a [Transaction.recurringGroupId]), delete and update
+ * operations pause and set [CalendarUiState.recurringDialog] so the UI can ask the user whether
+ * to apply the change to just this entry or to this and all future entries in the series.
  */
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
-    private val getExpensesByMonthUseCase: GetExpensesByMonthUseCase,
-    private val addExpenseUseCase: AddExpenseUseCase,
-    private val updateExpenseUseCase: UpdateExpenseUseCase,
-    private val updateExpenseSeriesUseCase: UpdateExpenseSeriesUseCase,
-    private val deleteExpenseUseCase: DeleteExpenseUseCase,
-    private val deleteExpenseSeriesUseCase: DeleteExpenseSeriesUseCase,
-    private val getIncomesUseCase: GetIncomesUseCase,
-    private val addIncomeUseCase: AddIncomeUseCase,
-    private val updateIncomeUseCase: UpdateIncomeUseCase,
-    private val updateIncomeSeriesUseCase: UpdateIncomeSeriesUseCase,
-    private val deleteIncomeUseCase: DeleteIncomeUseCase,
-    private val deleteIncomeSeriesUseCase: DeleteIncomeSeriesUseCase,
+    private val getTransactionsByMonthUseCase: GetTransactionsByMonthUseCase,
+    private val addTransactionUseCase: AddTransactionUseCase,
+    private val updateTransactionUseCase: UpdateTransactionUseCase,
+    private val updateTransactionSeriesUseCase: UpdateTransactionSeriesUseCase,
+    private val deleteTransactionUseCase: DeleteTransactionUseCase,
+    private val deleteTransactionSeriesUseCase: DeleteTransactionSeriesUseCase,
     private val getPayCycleStartDayUseCase: GetPayCycleStartDayUseCase
 ) : ViewModel() {
 
@@ -135,21 +117,27 @@ class CalendarViewModel @Inject constructor(
         monthJob?.cancel()
         _uiState.update { it.copy(isLoading = true, selectedMonth = month) }
         monthJob = viewModelScope.launch {
-            val (start, end) = DateUtils.monthBounds(month, startDay)
-            combine(
-                getExpensesByMonthUseCase(start, end),
-                getIncomesUseCase(start, end)
-            ) { expenses, incomes -> expenses to incomes }
-                .collect { (expenses, incomes) ->
-                    _uiState.update {
-                        it.copy(
-                            expenses = expenses.filter { e -> !e.isRecurring },
-                            recurringExpenses = expenses.filter { e -> e.isRecurring },
-                            incomes = incomes,
-                            isLoading = false
-                        )
-                    }
+            val (start, end) = DateUtils.monthDateRange(month, startDay)
+            getTransactionsByMonthUseCase(start, end).collect { transactions ->
+                _uiState.update {
+                    it.copy(
+                        transactions = transactions.filter { t -> !t.isRecurring },
+                        recurringTransactions = transactions.filter { t -> t.isRecurring },
+                        isLoading = false
+                    )
                 }
+            }
+        }
+    }
+
+    /** Returns [base] moved forward by [steps] cadence intervals of [unit], each [value] long. */
+    private fun advance(base: LocalDate, unit: CadenceUnit, value: Int, steps: Int): LocalDate {
+        val amount = (value * steps).toLong()
+        return when (unit) {
+            CadenceUnit.DAYS -> base.plusDays(amount)
+            CadenceUnit.WEEKS -> base.plusWeeks(amount)
+            CadenceUnit.MONTHS -> base.plusMonths(amount)
+            CadenceUnit.YEARS -> base.plusYears(amount)
         }
     }
 
@@ -161,143 +149,87 @@ class CalendarViewModel @Inject constructor(
             CalendarEvent.NextMonth ->
                 loadMonth(_uiState.value.selectedMonth.plusMonths(1))
 
-            is CalendarEvent.AddExpense -> viewModelScope.launch {
-                val expense = event.expense
-                if (expense.isRecurring && event.durationMonths > 1) {
+            is CalendarEvent.AddTransaction -> viewModelScope.launch {
+                val transaction = event.transaction
+                if (transaction.isRecurring && event.durationMonths > 1) {
                     val groupId = UUID.randomUUID().toString()
-                    val cadence = expense.cadenceMonths.coerceAtLeast(1)
+                    val cadence = transaction.cadenceValue.coerceAtLeast(1)
                     repeat(event.durationMonths) { i ->
-                        addExpenseUseCase(
-                            expense.copy(
+                        // Every copy needs its own id: inserts use REPLACE, so a shared id would
+                        // overwrite the previous copy and leave a single row.
+                        addTransactionUseCase(
+                            transaction.copy(
+                                id = UUID.randomUUID().toString(),
                                 recurringGroupId = groupId,
-                                date = DateUtils.addMonths(expense.date, i * cadence)
+                                date = advance(transaction.date, transaction.cadenceUnit, cadence, i)
                             )
                         )
                     }
                 } else {
-                    addExpenseUseCase(expense)
+                    addTransactionUseCase(transaction)
                 }
-                _uiState.update { it.copy(isExpenseSheetOpen = false, expenseSheetTarget = null) }
+                _uiState.update { it.copy(isTransactionSheetOpen = false, transactionSheetTarget = null) }
             }
 
-            is CalendarEvent.UpdateExpense -> {
-                if (event.expense.recurringGroupId != null) {
+            is CalendarEvent.UpdateTransaction -> {
+                if (event.transaction.recurringGroupId != null) {
                     _uiState.update {
                         it.copy(
-                            isExpenseSheetOpen = false,
-                            expenseSheetTarget = null,
-                            recurringDialog = RecurringDialogState.PendingUpdateExpense(event.expense)
+                            isTransactionSheetOpen = false,
+                            transactionSheetTarget = null,
+                            recurringDialog = RecurringDialogState.PendingUpdate(event.transaction)
                         )
                     }
                 } else {
-                    viewModelScope.launch { updateExpenseUseCase(event.expense) }
-                    _uiState.update { it.copy(isExpenseSheetOpen = false, expenseSheetTarget = null) }
+                    viewModelScope.launch { updateTransactionUseCase(event.transaction) }
+                    _uiState.update { it.copy(isTransactionSheetOpen = false, transactionSheetTarget = null) }
                 }
             }
 
-            is CalendarEvent.DeleteExpense -> {
-                if (event.expense.recurringGroupId != null) {
+            is CalendarEvent.DeleteTransaction -> {
+                if (event.transaction.recurringGroupId != null) {
                     _uiState.update {
-                        it.copy(recurringDialog = RecurringDialogState.PendingDeleteExpense(event.expense))
+                        it.copy(recurringDialog = RecurringDialogState.PendingDelete(event.transaction))
                     }
                 } else {
-                    viewModelScope.launch { deleteExpenseUseCase(event.expense) }
+                    viewModelScope.launch { deleteTransactionUseCase(event.transaction) }
                 }
             }
 
-            is CalendarEvent.ConfirmDeleteExpense -> viewModelScope.launch {
+            is CalendarEvent.ConfirmDelete -> viewModelScope.launch {
                 when (event.scope) {
-                    RecurringScope.THIS_ONLY -> deleteExpenseUseCase(event.expense)
-                    RecurringScope.THIS_AND_FUTURE -> deleteExpenseSeriesUseCase(
-                        event.expense.recurringGroupId!!, event.expense.date
+                    RecurringScope.THIS_ONLY -> deleteTransactionUseCase(event.transaction)
+                    RecurringScope.THIS_AND_FUTURE -> deleteTransactionSeriesUseCase(
+                        event.transaction.recurringGroupId!!, event.transaction.date
                     )
                 }
                 _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
             }
 
-            is CalendarEvent.ConfirmUpdateExpense -> viewModelScope.launch {
+            is CalendarEvent.ConfirmUpdate -> viewModelScope.launch {
                 when (event.scope) {
-                    RecurringScope.THIS_ONLY -> updateExpenseUseCase(event.expense)
-                    RecurringScope.THIS_AND_FUTURE -> updateExpenseSeriesUseCase(event.expense)
-                }
-                _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
-            }
-
-            CalendarEvent.ShowAddExpenseSheet ->
-                _uiState.update { it.copy(isExpenseSheetOpen = true, expenseSheetTarget = null) }
-            is CalendarEvent.ShowEditExpenseSheet ->
-                _uiState.update { it.copy(isExpenseSheetOpen = true, expenseSheetTarget = event.expense) }
-            CalendarEvent.HideExpenseSheet ->
-                _uiState.update { it.copy(isExpenseSheetOpen = false, expenseSheetTarget = null) }
-
-            is CalendarEvent.AddIncome -> viewModelScope.launch {
-                val income = event.income
-                if (income.isRecurring && event.durationMonths > 1) {
-                    val groupId = UUID.randomUUID().toString()
-                    val cadence = income.cadenceMonths
-                    repeat(event.durationMonths) { i ->
-                        addIncomeUseCase(
-                            income.copy(
-                                recurringGroupId = groupId,
-                                startDate = DateUtils.addMonths(income.startDate, i * cadence)
-                            )
-                        )
-                    }
-                } else {
-                    addIncomeUseCase(income)
-                }
-                _uiState.update { it.copy(isIncomeSheetOpen = false, incomeSheetTarget = null) }
-            }
-
-            is CalendarEvent.UpdateIncome -> {
-                if (event.income.recurringGroupId != null) {
-                    _uiState.update {
-                        it.copy(
-                            isIncomeSheetOpen = false,
-                            incomeSheetTarget = null,
-                            recurringDialog = RecurringDialogState.PendingUpdateIncome(event.income)
-                        )
-                    }
-                } else {
-                    viewModelScope.launch { updateIncomeUseCase(event.income) }
-                    _uiState.update { it.copy(isIncomeSheetOpen = false, incomeSheetTarget = null) }
-                }
-            }
-
-            is CalendarEvent.DeleteIncome -> {
-                if (event.income.recurringGroupId != null) {
-                    _uiState.update {
-                        it.copy(recurringDialog = RecurringDialogState.PendingDeleteIncome(event.income))
-                    }
-                } else {
-                    viewModelScope.launch { deleteIncomeUseCase(event.income) }
-                }
-            }
-
-            is CalendarEvent.ConfirmDeleteIncome -> viewModelScope.launch {
-                when (event.scope) {
-                    RecurringScope.THIS_ONLY -> deleteIncomeUseCase(event.income)
-                    RecurringScope.THIS_AND_FUTURE -> deleteIncomeSeriesUseCase(
-                        event.income.recurringGroupId!!, event.income.startDate
+                    RecurringScope.THIS_ONLY -> updateTransactionUseCase(event.transaction)
+                    RecurringScope.THIS_AND_FUTURE -> updateTransactionSeriesUseCase(
+                        event.transaction.date, event.transaction
                     )
                 }
                 _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
             }
 
-            is CalendarEvent.ConfirmUpdateIncome -> viewModelScope.launch {
-                when (event.scope) {
-                    RecurringScope.THIS_ONLY -> updateIncomeUseCase(event.income)
-                    RecurringScope.THIS_AND_FUTURE -> updateIncomeSeriesUseCase(event.income)
+            is CalendarEvent.ShowAddTransactionSheet ->
+                _uiState.update {
+                    it.copy(
+                        isTransactionSheetOpen = true,
+                        transactionSheetTarget = null,
+                        sheetDefaultType = event.type
+                    )
                 }
-                _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
-            }
-
-            CalendarEvent.ShowAddIncomeSheet ->
-                _uiState.update { it.copy(isIncomeSheetOpen = true, incomeSheetTarget = null) }
-            is CalendarEvent.ShowEditIncomeSheet ->
-                _uiState.update { it.copy(isIncomeSheetOpen = true, incomeSheetTarget = event.income) }
-            CalendarEvent.HideIncomeSheet ->
-                _uiState.update { it.copy(isIncomeSheetOpen = false, incomeSheetTarget = null) }
+            is CalendarEvent.ShowEditTransactionSheet ->
+                _uiState.update {
+                    it.copy(isTransactionSheetOpen = true, transactionSheetTarget = event.transaction)
+                }
+            CalendarEvent.HideTransactionSheet ->
+                _uiState.update { it.copy(isTransactionSheetOpen = false, transactionSheetTarget = null) }
 
             CalendarEvent.DismissRecurringDialog ->
                 _uiState.update { it.copy(recurringDialog = RecurringDialogState.None) }
