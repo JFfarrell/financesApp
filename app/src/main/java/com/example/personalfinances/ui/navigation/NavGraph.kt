@@ -13,6 +13,7 @@ import com.example.personalfinances.ui.screen.dashboard.DashboardScreen
 import com.example.personalfinances.ui.screen.manage.ManageScreen
 import com.example.personalfinances.ui.screen.monthly.CalendarScreen
 import com.example.personalfinances.ui.screen.savings.SavingsScreen
+import com.example.personalfinances.ui.screen.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -43,8 +44,9 @@ fun AppNavGraph(navController: NavHostController) {
 }
 
 /**
- * The signed-in app shell: the tab destinations plus the floating bottom bar. [onLogout] is
- * called when the user chooses Log out in the Home settings sheet.
+ * The signed-in app shell: the tab destinations, the Settings and Manage screens reached from
+ * Home, and the floating bottom bar. [onLogout] is called when the user chooses Log out in
+ * Settings.
  */
 @Composable
 fun MainScaffold(onLogout: () -> Unit) {
@@ -60,12 +62,18 @@ fun MainScaffold(onLogout: () -> Unit) {
         ) {
             composable(AppDestination.Home.route) {
                 DashboardScreen(
-                    onLogout = onLogout,
-                    onOpenManage = { bottomNavController.navigate(AppDestination.Manage.route) }
+                    onOpenSettings = { bottomNavController.navigate(AppDestination.Settings.route) }
                 )
             }
             composable(AppDestination.Calendar.route) { CalendarScreen() }
             composable(AppDestination.Savings.route)  { SavingsScreen() }
+            composable(AppDestination.Settings.route) {
+                SettingsScreen(
+                    onBack = { bottomNavController.popBackStack() },
+                    onManage = { bottomNavController.navigate(AppDestination.Manage.route) },
+                    onLogout = onLogout
+                )
+            }
             composable(AppDestination.Manage.route) {
                 ManageScreen(onBack = { bottomNavController.popBackStack() })
             }

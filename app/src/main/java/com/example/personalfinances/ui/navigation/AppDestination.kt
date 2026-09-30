@@ -7,4 +7,5 @@ sealed class AppDestination(val route: String) {
     object Calendar : AppDestination("calendar")
     object Savings  : AppDestination("savings")
     object Manage   : AppDestination("manage")
+    object Settings : AppDestination("settings")
 }

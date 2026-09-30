@@ -28,7 +28,7 @@ import com.example.personalfinances.domain.model.Transaction
 import com.example.personalfinances.domain.model.enums.CadenceUnit
 import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.ui.theme.wallet
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 
 /**
  * A single row in the transaction list, used for every [TransactionType].
@@ -49,9 +49,10 @@ fun TransactionListItem(
     modifier: Modifier = Modifier
 ) {
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
     val category = wallet.categoryColor(transaction.category.name)
 
-    val amountText = CurrencyFormatter.format(transaction.amount)
+    val amountText = money.format(transaction.amount)
     val (amount, amountColor) = when (transaction.transactionType) {
         TransactionType.EXPENSE -> "−$amountText" to wallet.text
         TransactionType.INCOME -> "+$amountText" to wallet.income

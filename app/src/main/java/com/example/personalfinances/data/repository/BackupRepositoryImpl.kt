@@ -55,6 +55,7 @@ class BackupRepositoryImpl @Inject constructor(
                 transactions = transactions,
                 savingsGoal = backupDao.savingsGoal(),
                 payCycleStartDay = settings.payCycleStartDay.first(),
+                currencyCode = settings.currencyCode.first(),
                 exportedAt = Instant.now().toString()
             )
 
@@ -100,6 +101,7 @@ class BackupRepositoryImpl @Inject constructor(
                 parsed.savingsGoal?.let { backupDao.upsertSavingsGoal(it) }
             }
             parsed.payCycleStartDay?.let { settings.savePayCycleStartDay(it) }
+            parsed.currencyCode?.let { settings.saveCurrencyCode(it) }
 
             BackupResult.Success(parsed.transactions.size, parsed.categories.size, parsed.merchants.size)
         } catch (e: BackupFormatException) {

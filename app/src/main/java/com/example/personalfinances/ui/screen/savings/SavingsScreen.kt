@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.ui.component.CircularProgressArc
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 
 /**
  * Root composable for the Savings screen.
@@ -59,6 +59,7 @@ import com.example.personalfinances.util.CurrencyFormatter
 fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
 
     Column(
         modifier = Modifier
@@ -121,16 +122,16 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                     }
 
                     Text(
-                        text = "Saved: ${CurrencyFormatter.format(uiState.currentSaved)}",
+                        text = "Saved: ${money.format(uiState.currentSaved)}",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Goal: ${CurrencyFormatter.format(uiState.goal.targetAmount)}",
+                        text = "Goal: ${money.format(uiState.goal.targetAmount)}",
                         style = MaterialTheme.typography.bodyLarge,
                         color = wallet.muted
                     )
                     Text(
-                        text = "Starting amount: ${CurrencyFormatter.format(uiState.goal.startingAmount)}",
+                        text = "Starting amount: ${money.format(uiState.goal.startingAmount)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = wallet.muted
                     )

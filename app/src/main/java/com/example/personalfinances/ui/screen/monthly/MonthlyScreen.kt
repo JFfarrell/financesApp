@@ -57,7 +57,8 @@ import com.example.personalfinances.ui.component.MonthSelector
 import com.example.personalfinances.ui.component.TransactionListItem
 import com.example.personalfinances.ui.screen.transaction.AddTransactionBottomSheet
 import com.example.personalfinances.ui.theme.wallet
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
+import com.example.personalfinances.util.MoneyFormatter
 import com.example.personalfinances.util.DateUtils
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -79,6 +80,7 @@ private enum class TransactionFilter(val label: String, val type: TransactionTyp
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var filter by rememberSaveable { mutableStateOf(TransactionFilter.ALL) }
+    val money = LocalMoneyFormatter.current
 
     // After a delete, offer Undo for a while. A new delete replaces the previous prompt (the effect
     // restarts with the new token and the old snackbar is dismissed), so only the latest can be undone.
@@ -167,7 +169,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         item(key = "header_$date") {
                             DayHeader(
                                 label = date.format(DateTimeFormatter.ofPattern("EEE d MMM")),
-                                total = dayTotal(dayItems)
+                                total = dayTotal(dayItems, money)
                             )
                         }
                         item(key = "group_$date") {
@@ -315,9 +317,9 @@ private fun DayCard(items: List<Transaction>, onEvent: (CalendarEvent) -> Unit) 
  * The figure shown at the right of a day heading. Days with any income or expenses show their
  * net (income minus expenses, signed); a day with only savings shows the amount saved.
  */
-private fun dayTotal(items: List<Transaction>): String {
+private fun dayTotal(items: List<Transaction>, money: MoneyFormatter): String {
     val hasCash = items.any { it.transactionType != TransactionType.SAVING }
-    if (!hasCash) return CurrencyFormatter.format(items.sumOf { it.amount })
+    if (!hasCash) return money.format(items.sumOf { it.amount })
 
     val net = items.sumOf {
         when (it.transactionType) {
@@ -327,7 +329,7 @@ private fun dayTotal(items: List<Transaction>): String {
         }
     }
     val sign = if (net < 0) "−" else if (net > 0) "+" else ""
-    return sign + CurrencyFormatter.format(abs(net))
+    return sign + money.format(abs(net))
 }
 
 /**

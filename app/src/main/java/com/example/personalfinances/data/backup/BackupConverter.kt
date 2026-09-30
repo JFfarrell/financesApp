@@ -11,6 +11,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
+import java.util.Currency
 import java.time.format.DateTimeParseException
 
 /** Thrown when a backup file is well-formed JSON but its contents are not acceptable. */
@@ -22,7 +23,8 @@ class ParsedBackup(
     val merchants: List<MerchantEntity>,
     val transactions: List<TransactionEntity>,
     val savingsGoal: SavingsGoalEntity?,
-    val payCycleStartDay: Int?
+    val payCycleStartDay: Int?,
+    val currencyCode: String?
 )
 
 /** Builds the file contents from the database rows. */
@@ -32,10 +34,11 @@ fun buildBackupFile(
     transactions: List<TransactionEntity>,
     savingsGoal: SavingsGoalEntity?,
     payCycleStartDay: Int,
+    currencyCode: String?,
     exportedAt: String
 ) = BackupFile(
     exportedAt = exportedAt,
-    settings = BackupSettings(payCycleStartDay),
+    settings = BackupSettings(payCycleStartDay, currencyCode),
     savingsGoal = savingsGoal?.let { BackupSavingsGoal(it.targetAmount, it.startingAmount) },
     categories = categories.map { BackupCategory(it.id, it.name, it.transactionType) },
     merchants = merchants.map { BackupMerchant(it.id, it.name) },
@@ -165,7 +168,9 @@ fun parseBackup(
         savingsGoal = file.savingsGoal?.let {
             SavingsGoalEntity(id = 1, targetAmount = it.targetAmount, startingAmount = it.startingAmount)
         },
-        payCycleStartDay = file.settings.payCycleStartDay.takeIf { it in 1..28 }
+        payCycleStartDay = file.settings.payCycleStartDay.takeIf { it in 1..28 },
+        // An unknown code (for example from a hand-edited file) is ignored rather than rejected.
+        currencyCode = file.settings.currencyCode?.takeIf { runCatching { Currency.getInstance(it) }.isSuccess }
     )
 }
 

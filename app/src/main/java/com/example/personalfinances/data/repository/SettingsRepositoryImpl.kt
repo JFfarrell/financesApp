@@ -15,5 +15,7 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun getPayCycleStartDay(): Flow<Int> = dataStore.payCycleStartDay
     override suspend fun savePayCycleStartDay(day: Int) = dataStore.savePayCycleStartDay(day)
     override fun getThemeMode(): Flow<ThemeMode> = dataStore.themeMode
+    override fun getCurrencyCode(): Flow<String?> = dataStore.currencyCode
+    override suspend fun saveCurrencyCode(code: String?) = dataStore.saveCurrencyCode(code)
     override suspend fun saveThemeMode(mode: ThemeMode) = dataStore.saveThemeMode(mode)
 }

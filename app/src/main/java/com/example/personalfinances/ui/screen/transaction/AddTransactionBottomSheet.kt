@@ -73,7 +73,7 @@ import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.ui.component.CreatablePicker
 import com.example.personalfinances.ui.component.TagInput
 import com.example.personalfinances.ui.theme.wallet
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -130,6 +130,7 @@ fun AddTransactionBottomSheet(
     onSave: (Transaction, durationMonths: Int) -> Unit
 ) {
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val isEditMode = initialTransaction != null
 
@@ -225,8 +226,11 @@ fun AddTransactionBottomSheet(
                 }
             }
 
-            AmountDisplay(amountText = amountText)
-            Keypad(onKey = { key -> amountText = applyKey(amountText, key) })
+            AmountDisplay(amountText = amountText, symbol = money.symbol)
+            Keypad(
+                showDecimalPoint = money.fractionDigits > 0,
+                onKey = { key -> amountText = applyKey(amountText, key, money.fractionDigits) }
+            )
 
             Text("Category", style = MaterialTheme.typography.labelLarge, color = wallet.muted)
             FlowRow(
@@ -448,33 +452,35 @@ private fun formatAmount(amount: Double): String =
     BigDecimal.valueOf(amount).stripTrailingZeros().toPlainString()
 
 /**
- * Applies one keypad press to the amount text: digits append (up to nine whole digits and two
- * decimals), "." starts the decimals once, and "⌫" removes the last character.
+ * Applies one keypad press to the amount text: digits append (up to nine whole digits and
+ * [maxDecimals] decimals, the currency's usual number), "." starts the decimals once (and is
+ * ignored for currencies without decimals), and "⌫" removes the last character.
  */
-private fun applyKey(current: String, key: String): String = when (key) {
+private fun applyKey(current: String, key: String, maxDecimals: Int): String = when (key) {
     "⌫" -> current.dropLast(1)
     "." -> when {
+        maxDecimals == 0 -> current
         current.contains('.') -> current
         current.isEmpty() -> "0."
         else -> "$current."
     }
     else -> when {
-        current.contains('.') && current.substringAfter('.').length >= 2 -> current
+        current.contains('.') && current.substringAfter('.').length >= maxDecimals -> current
         !current.contains('.') && current.length >= 9 -> current
         current == "0" -> key
         else -> current + key
     }
 }
 
-/** The typed amount in large type beside the currency symbol; shows a muted 0 until typed. */
+/** The typed amount in large type beside the currency [symbol]; shows a muted 0 until typed. */
 @Composable
-private fun AmountDisplay(amountText: String) {
+private fun AmountDisplay(amountText: String, symbol: String) {
     val wallet = MaterialTheme.wallet
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Amount", style = MaterialTheme.typography.labelMedium, color = wallet.muted)
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text = CurrencyFormatter.symbol,
+                text = symbol,
                 style = MaterialTheme.typography.headlineMedium,
                 color = wallet.muted,
                 modifier = Modifier.padding(end = 4.dp, bottom = 6.dp)
@@ -551,10 +557,13 @@ private fun DetailChip(icon: ImageVector, label: String, open: Boolean, onClick:
     )
 }
 
-/** On-screen number pad: digits 0-9, a decimal point and backspace, in a 3 by 4 grid. */
+/**
+ * On-screen number pad: digits 0-9, a decimal point and backspace, in a 3 by 4 grid. The decimal
+ * point is left blank for currencies that have no decimals.
+ */
 @Composable
-private fun Keypad(onKey: (String) -> Unit) {
-    val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫")
+private fun Keypad(showDecimalPoint: Boolean, onKey: (String) -> Unit) {
+    val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", if (showDecimalPoint) "." else "", "0", "⌫")
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         keys.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -567,6 +576,11 @@ private fun Keypad(onKey: (String) -> Unit) {
 @Composable
 private fun RowScope.KeypadKey(key: String, onClick: () -> Unit) {
     val wallet = MaterialTheme.wallet
+    // A blank key (the decimal point of a currency without decimals) is just an empty gap.
+    if (key.isEmpty()) {
+        Box(modifier = Modifier.weight(1f).height(50.dp))
+        return
+    }
     Box(
         modifier = Modifier
             .weight(1f)

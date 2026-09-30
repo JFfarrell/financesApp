@@ -27,6 +27,7 @@ class SettingsDataStore @Inject constructor(
         val PAY_CYCLE_START_DAY_KEY = intPreferencesKey("pay_cycle_start_day")
         val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         val LAST_BACKUP_AT_KEY = longPreferencesKey("last_backup_at")
+        val CURRENCY_CODE_KEY = stringPreferencesKey("currency_code")
     }
 
     val payCycleStartDay: Flow<Int> = dataStore.data.map { it[PAY_CYCLE_START_DAY_KEY] ?: 1 }
@@ -42,6 +43,19 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun saveThemeMode(mode: ThemeMode) {
         dataStore.edit { it[THEME_MODE_KEY] = mode.name }
+    }
+
+    /**
+     * Emits the ISO 4217 code of the currency the user chose (for example "EUR"), or null to follow
+     * the phone's own currency.
+     */
+    val currencyCode: Flow<String?> = dataStore.data.map { it[CURRENCY_CODE_KEY] }
+
+    /** Saves the chosen currency code; null clears the choice so the phone's currency is used. */
+    suspend fun saveCurrencyCode(code: String?) {
+        dataStore.edit { prefs ->
+            if (code == null) prefs.remove(CURRENCY_CODE_KEY) else prefs[CURRENCY_CODE_KEY] = code
+        }
     }
 
     /** Emits when the last backup was saved (epoch milliseconds), or null if there never was one. */

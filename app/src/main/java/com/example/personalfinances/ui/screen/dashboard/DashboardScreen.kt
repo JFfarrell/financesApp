@@ -70,12 +70,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.personalfinances.domain.model.enums.ThemeMode
 import com.example.personalfinances.ui.component.MonthSelector
 import com.example.personalfinances.ui.theme.DarkWalletColors
 import com.example.personalfinances.ui.theme.LightWalletColors
 import com.example.personalfinances.ui.theme.wallet
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.screen.settings.BackupEvent
+import com.example.personalfinances.ui.screen.settings.BackupViewModel
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -87,28 +88,24 @@ import kotlin.math.roundToInt
  * Home screen: what is left this month, where it went, and progress towards the savings goal.
  *
  * Drawn as three cards under the month picker: the summary ([SummaryHero]), the spending donut
- * ([CategoryDonutCard]) and the goal ([SavingsGoalCard]). The settings button opens
- * [SettingsSheet], which holds the appearance choice, the pay-cycle start day, a link to the
- * category and merchant manager ([onOpenManage]), backup, and Log out (which calls [onLogout]).
- * A card at the top reminds the user to back up when there is data and no recent backup.
+ * ([CategoryDonutCard]) and the goal ([SavingsGoalCard]). The settings button calls
+ * [onOpenSettings]. A card at the top reminds the user to back up when there is data and no
+ * recent backup, and "Back up now" opens the file picker straight away.
  */
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
-    onLogout: () -> Unit = {},
-    onOpenManage: () -> Unit = {}
+    backupViewModel: BackupViewModel = hiltViewModel(),
+    onOpenSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val backupState by backupViewModel.uiState.collectAsState()
 
     // The system file picker: no storage permission is needed, and the user chooses where the
-    // backup lives (device storage, a cloud drive, an SD card, ...). Shared by the reminder card
-    // and the Settings sheet.
+    // backup lives (device storage, a cloud drive, an SD card, ...).
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> if (uri != null) viewModel.onEvent(DashboardEvent.ExportBackup(uri.toString())) }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) viewModel.onEvent(DashboardEvent.RequestImport(uri.toString())) }
+    ) { uri -> if (uri != null) backupViewModel.onEvent(BackupEvent.Export(uri.toString())) }
     val startExport = { exportLauncher.launch("personal-wallot-backup-${LocalDate.now()}.json") }
 
     Column(
@@ -117,7 +114,7 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        HomeHeader(onSettingsClick = { viewModel.onEvent(DashboardEvent.ShowSettingsSheet) })
+        HomeHeader(onSettingsClick = onOpenSettings)
         MonthSelector(
             selectedMonth = uiState.selectedMonth,
             onPreviousMonth = { viewModel.onEvent(DashboardEvent.PreviousMonth) },
@@ -137,21 +134,21 @@ fun DashboardScreen(
                     .padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val reminder = uiState.backupReminder
-                if (reminder != null && !uiState.reminderDismissed) {
+                val reminder = backupState.reminder
+                if (reminder != null && !backupState.reminderDismissed) {
                     BackupReminderCard(
                         daysSince = reminder.daysSince,
                         onBackUp = startExport,
-                        onLater = { viewModel.onEvent(DashboardEvent.DismissBackupReminder) }
+                        onLater = { backupViewModel.onEvent(BackupEvent.DismissReminder) }
                     )
                 }
-                // Result of a backup started from the reminder (the Settings sheet shows its own).
-                val backupMessage = uiState.backupMessage
-                if (backupMessage != null && !uiState.isSettingsSheetOpen) {
+                // Result of a backup started from the reminder.
+                val backupMessage = backupState.message
+                if (backupMessage != null) {
                     BackupMessageRow(
                         message = backupMessage,
-                        isError = uiState.backupIsError,
-                        onDismiss = { viewModel.onEvent(DashboardEvent.DismissBackupMessage) }
+                        isError = backupState.isError,
+                        onDismiss = { backupViewModel.onEvent(BackupEvent.DismissMessage) }
                     )
                 }
                 SummaryHero(
@@ -168,47 +165,6 @@ fun DashboardScreen(
                 )
             }
         }
-    }
-
-    if (uiState.isSettingsSheetOpen) {
-        SettingsSheet(
-            currentStartDay = uiState.payCycleStartDay,
-            themeMode = uiState.themeMode,
-            onThemeSelected = { viewModel.onEvent(DashboardEvent.SetThemeMode(it)) },
-            onDismiss = { viewModel.onEvent(DashboardEvent.HideSettingsSheet) },
-            onSave = { day -> viewModel.onEvent(DashboardEvent.SetPayCycleStartDay(day)) },
-            lastBackupAt = uiState.lastBackupAt,
-            isBackupBusy = uiState.isBackupBusy,
-            backupMessage = uiState.backupMessage,
-            backupIsError = uiState.backupIsError,
-            onExportClick = startExport,
-            onImportClick = { importLauncher.launch(arrayOf("*/*")) },
-            onManage = {
-                // Close the sheet first, or it would still be open when the user comes back.
-                viewModel.onEvent(DashboardEvent.HideSettingsSheet)
-                onOpenManage()
-            },
-            onLogout = onLogout
-        )
-    }
-
-    if (uiState.pendingImport != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.onEvent(DashboardEvent.CancelImport) },
-            title = { Text("Import backup?") },
-            text = {
-                Text(
-                    "Everything in the file is added. Anything that already exists here is replaced " +
-                        "by the version in the file. Nothing is deleted."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onEvent(DashboardEvent.ConfirmImport) }) { Text("Import") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.onEvent(DashboardEvent.CancelImport) }) { Text("Cancel") }
-            }
-        )
     }
 }
 
@@ -239,6 +195,7 @@ private fun HomeHeader(onSettingsClick: () -> Unit) {
 @Composable
 private fun SummaryHero(remainder: Double, spent: Double, saved: Double, income: Double) {
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
     // If more went out than came in, the bar shows only spending and savings, in proportion.
     val total = max(income, spent + saved)
     val left = (total - spent - saved).coerceAtLeast(0.0)
@@ -257,7 +214,7 @@ private fun SummaryHero(remainder: Double, spent: Double, saved: Double, income:
             color = wallet.onHero.copy(alpha = 0.9f)
         )
         Text(
-            text = CurrencyFormatter.format(remainder),
+            text = money.format(remainder),
             style = MaterialTheme.typography.displaySmall.copy(fontSize = 44.sp, fontWeight = FontWeight.Bold),
             color = wallet.onHero
         )
@@ -291,13 +248,14 @@ private fun SummaryHero(remainder: Double, spent: Double, saved: Double, income:
 @Composable
 private fun HeroStat(label: String, amount: Double, dot: Color, modifier: Modifier = Modifier) {
     val onHero = MaterialTheme.wallet.onHero
+    val money = LocalMoneyFormatter.current
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
             Text(label, style = MaterialTheme.typography.labelMedium, color = onHero.copy(alpha = 0.85f))
         }
         Text(
-            text = CurrencyFormatter.format(amount),
+            text = money.format(amount),
             style = MaterialTheme.typography.titleSmall,
             color = onHero
         )
@@ -313,6 +271,7 @@ private fun HeroStat(label: String, amount: Double, dot: Color, modifier: Modifi
 @Composable
 private fun CategoryDonutCard(byCategory: Map<String, Double>) {
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
     val sorted = byCategory.entries.sortedByDescending { it.value }
     val total = sorted.sumOf { it.value }
 
@@ -353,7 +312,7 @@ private fun CategoryDonutCard(byCategory: Map<String, Double>) {
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(CurrencyFormatter.format(total), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Text(money.format(total), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                 Text("went out", style = MaterialTheme.typography.labelMedium, color = wallet.muted)
             }
         }
@@ -385,6 +344,7 @@ private fun CategoryDonutCard(byCategory: Map<String, Double>) {
 @Composable
 private fun SavingsGoalCard(target: Double, current: Double, savedThisCycle: Double) {
     val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
     Column(
         modifier = Modifier
             .padding(horizontal = 20.dp)
@@ -406,7 +366,7 @@ private fun SavingsGoalCard(target: Double, current: Double, savedThisCycle: Dou
                 softWrap = false
             )
             Text(
-                text = "${CurrencyFormatter.format(savedThisCycle)} saved this cycle",
+                text = "${money.format(savedThisCycle)} saved this cycle",
                 style = MaterialTheme.typography.labelMedium,
                 color = wallet.muted,
                 textAlign = TextAlign.End,
@@ -419,12 +379,12 @@ private fun SavingsGoalCard(target: Double, current: Double, savedThisCycle: Dou
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = CurrencyFormatter.format(current),
+                text = money.format(current),
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
             )
             if (target > 0.0) {
                 Text(
-                    text = "of ${CurrencyFormatter.format(target)}",
+                    text = "of ${money.format(target)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = wallet.muted,
                     modifier = Modifier.padding(bottom = 3.dp)
@@ -515,237 +475,5 @@ private fun BackupMessageRow(message: String, isError: Boolean, onDismiss: () ->
             modifier = Modifier.weight(1f)
         )
         TextButton(onClick = onDismiss) { Text("OK") }
-    }
-}
-
-/**
- * Settings bottom sheet. Choosing an appearance applies immediately; the pay-cycle day is applied
- * with Save, which also closes the sheet.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SettingsSheet(
-    currentStartDay: Int,
-    themeMode: ThemeMode,
-    onThemeSelected: (ThemeMode) -> Unit,
-    onDismiss: () -> Unit,
-    onSave: (Int) -> Unit,
-    lastBackupAt: Long?,
-    isBackupBusy: Boolean,
-    backupMessage: String?,
-    backupIsError: Boolean,
-    onExportClick: () -> Unit,
-    onImportClick: () -> Unit,
-    onManage: () -> Unit,
-    onLogout: () -> Unit
-) {
-    val wallet = MaterialTheme.wallet
-    val sheetState = rememberModalBottomSheetState()
-
-
-    val lastBackupText = lastBackupAt?.let {
-        "Last backup: " + Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
-            .format(DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm"))
-    } ?: "You have not made a backup yet."
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var selectedDay by remember { mutableStateOf(currentStartDay) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = wallet.sheet
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
-                .navigationBarsPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Settings", style = MaterialTheme.typography.titleLarge)
-
-            Text("Appearance", style = MaterialTheme.typography.labelLarge, color = wallet.muted)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    ThemeOptionTile(
-                        mode = mode,
-                        selected = mode == themeMode,
-                        onClick = { onThemeSelected(mode) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Text(
-                text = "System follows your phone's dark mode setting.",
-                style = MaterialTheme.typography.bodySmall,
-                color = wallet.muted
-            )
-
-            Text(
-                text = "Pay cycle",
-                style = MaterialTheme.typography.labelLarge,
-                color = wallet.muted,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            ExposedDropdownMenuBox(
-                expanded = dropdownExpanded,
-                onExpandedChange = { dropdownExpanded = it }
-            ) {
-                OutlinedTextField(
-                    value = "Day $selectedDay",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Pay cycle starts on") },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = dropdownExpanded,
-                    onDismissRequest = { dropdownExpanded = false }
-                ) {
-                    (1..28).forEach { day ->
-                        DropdownMenuItem(
-                            text = { Text("Day $day") },
-                            onClick = {
-                                selectedDay = day
-                                dropdownExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Button(
-                onClick = { onSave(selectedDay) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-            ) {
-                Text("Save")
-            }
-
-            OutlinedButton(
-                onClick = onManage,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                border = BorderStroke(1.dp, wallet.outline),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
-            ) { Text("Categories & merchants") }
-
-            Text(
-                text = "Backup",
-                style = MaterialTheme.typography.labelLarge,
-                color = wallet.muted,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Text(lastBackupText, style = MaterialTheme.typography.bodySmall, color = wallet.muted)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onExportClick,
-                    enabled = !isBackupBusy,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    border = BorderStroke(1.dp, wallet.outline),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
-                ) { Text("Export") }
-                OutlinedButton(
-                    onClick = onImportClick,
-                    enabled = !isBackupBusy,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    border = BorderStroke(1.dp, wallet.outline),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
-                ) { Text("Import") }
-            }
-            if (backupMessage != null) {
-                Text(
-                    text = backupMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (backupIsError) MaterialTheme.colorScheme.error else wallet.muted
-                )
-            }
-
-            OutlinedButton(
-                onClick = onLogout,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                border = BorderStroke(1.dp, wallet.outline),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = wallet.text)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Logout,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text("Log out", modifier = Modifier.padding(start = 8.dp))
-            }
-        }
-    }
-}
-
-/**
- * One choice in the appearance picker: a small preview of the theme, its name, and a border and
- * tick when selected. The preview always shows the theme's own colours, whichever theme is
- * active now; System is split diagonally between light and dark.
- */
-@Composable
-private fun ThemeOptionTile(
-    mode: ThemeMode,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val wallet = MaterialTheme.wallet
-    val light = LightWalletColors.background
-    val dark = DarkWalletColors.background
-    val preview: Brush = when (mode) {
-        ThemeMode.LIGHT -> SolidColor(light)
-        ThemeMode.DARK -> SolidColor(dark)
-        ThemeMode.SYSTEM -> Brush.linearGradient(
-            0f to light, 0.5f to light, 0.5f to dark, 1f to dark
-        )
-    }
-    val shape = RoundedCornerShape(20.dp)
-
-    Column(
-        modifier = modifier
-            .clip(shape)
-            .border(BorderStroke(2.dp, if (selected) MaterialTheme.colorScheme.primary else wallet.outline), shape)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(preview)
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = wallet.onNavIndicator,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Text(mode.displayName, style = MaterialTheme.typography.labelLarge)
-        }
     }
 }

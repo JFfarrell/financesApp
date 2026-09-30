@@ -15,5 +15,9 @@ interface SettingsRepository {
     fun getPayCycleStartDay(): Flow<Int>
     suspend fun savePayCycleStartDay(day: Int)
     fun getThemeMode(): Flow<ThemeMode>
+
+    /** Emits the chosen ISO 4217 currency code, or null to follow the phone's currency. */
+    fun getCurrencyCode(): Flow<String?>
+    suspend fun saveCurrencyCode(code: String?)
     suspend fun saveThemeMode(mode: ThemeMode)
 }

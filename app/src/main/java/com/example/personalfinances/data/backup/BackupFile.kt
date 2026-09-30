@@ -31,7 +31,11 @@ data class BackupFile(
 )
 
 @Serializable
-data class BackupSettings(val payCycleStartDay: Int = 1)
+data class BackupSettings(
+    val payCycleStartDay: Int = 1,
+    /** ISO 4217 code, or null when the user had not chosen one (the phone's currency is used). */
+    val currencyCode: String? = null
+)
 
 @Serializable
 data class BackupSavingsGoal(val targetAmount: Double, val startingAmount: Double)

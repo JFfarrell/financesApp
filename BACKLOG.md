@@ -206,7 +206,7 @@ A lossless, versioned export of all data (transactions, categories, merchants, s
 
 Import matches categories (by type and name) and merchants (by name) against existing ones, so restoring onto a fresh install does not duplicate the seeded default categories.
 
-Done: Export and Import in the Settings sheet (`BackupRepository`, `BackupDao`, `BackupFile`). The file holds transactions, categories, merchants, the savings goal and the pay-cycle day, and is validated before anything is written; import is all-or-nothing and never deletes. Settings shows the last backup time. Possible later additions: a periodic reminder if the last backup is old, scheduled automatic exports to a chosen folder, and an option to restore by replacing everything rather than merging.
+Done: Export and Import in Settings (`BackupRepository`, `BackupDao`, `BackupFile`). The file holds transactions, categories, merchants, the savings goal and the pay-cycle day, and is validated before anything is written; import is all-or-nothing and never deletes. Settings shows the last backup time. Possible later additions: a periodic reminder if the last backup is old, scheduled automatic exports to a chosen folder, and an option to restore by replacing everything rather than merging.
 
 **Complexity:** Medium.
 
@@ -238,12 +238,12 @@ One layout with two palettes (light "Calm", dark "Focus"), chosen from design mo
 - [x] Theme mode (System, Light, Dark): `ThemeMode`, stored in DataStore, `AppViewModel`, applied in `MainActivity` with system bar styling
 - [x] Floating bottom bar with three tabs; the add button sits at the top right of the Transactions screen
 - [x] Month pill showing the pay-cycle date range
-- [x] Home: hero card, spending donut, savings goal card, Settings sheet with the appearance tiles
+- [x] Home: hero card, spending donut, savings goal card
 - [x] Transactions: filter chips, day-grouped cards, new row with category avatar, merchant, tags and repeat icon
 - [x] Add sheet: type control, keypad, category chips, detail chips with inline editors
 - [x] Savings screen restyled; progress arc uses theme colours
 - [x] Login screen keeps its old layout; the theme now supplies a background so the password text is readable in dark mode
-- [x] Log out button in the Settings sheet: returns to the login screen (the saved password is kept)
+- [x] Log out button in Settings: returns to the login screen (the saved password is kept)
 - [ ] Optional: show/hide toggle on the password field
 - [ ] Extra themes later: add a palette to `WalletColors.kt` and extend `ThemeMode`
 
@@ -269,9 +269,21 @@ Preparation for using the app permanently.
 
 - [x] Undo after deleting a transaction or a "this and future" series (restores the whole set)
 - [x] Backup reminder card on Home (no backup yet, or last backup 14 or more days ago), with "Back up now" and "Later"
-- [x] Manage screen (Settings, then "Categories & merchants"): rename and delete, with usage counts. Blank and duplicate names refused; items in use cannot be deleted.
+- [x] Manage screen (Settings, Data, then "Categories & merchants"): rename and delete, with usage counts. Blank and duplicate names refused; items in use cannot be deleted.
 - [ ] Merge two categories or merchants (move a category's transactions to another, then delete it)
 - [ ] Undo for other destructive actions (deleting a category or merchant is not undoable, but is only allowed when unused)
+
+---
+
+### 23. Currency Setting and Settings Screen
+**Status:** Done (needs on-device check)
+
+- [x] User-chosen currency (any ISO 4217 code, default the phone's), stored in DataStore, shown everywhere through `LocalMoneyFormatter`; included in the backup file. Display only: amounts are not converted.
+- [x] Keypad decimals follow the currency (none for yen)
+- [x] Settings moved from a crowded bottom sheet to a full screen of grouped cards (General, Appearance, Data, Account) with small pickers in dialogs; a searchable currency picker
+- [x] Backup logic split into `BackupViewModel`, shared by Home (reminder) and Settings; `DashboardViewModel` slimmed down
+- [x] Unit tests for money formatting and for the backup import rules
+- [ ] Possible: per-transaction or per-account currencies (not supported: one currency for all amounts)
 
 ---
 
