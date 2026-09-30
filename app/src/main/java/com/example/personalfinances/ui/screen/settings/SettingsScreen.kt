@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.personalfinances.domain.model.AutoBackupStatus
 import com.example.personalfinances.domain.model.enums.ThemeMode
 import com.example.personalfinances.ui.theme.DarkWalletColors
 import com.example.personalfinances.ui.theme.LightWalletColors
@@ -67,14 +68,17 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/** The file type of an Excel workbook, so the system picker saves it with an .xlsx extension. */
+private const val XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
 /** Which small picker dialog, if any, is open on the Settings screen. */
-private enum class SettingsDialog { NONE, CURRENCY, PAY_CYCLE }
+private enum class SettingsDialog { NONE, CURRENCY, PAY_CYCLE, REPORT_YEAR, AUTO_BACKUP }
 
 /**
  * Settings screen, laid out as grouped cards so related choices sit together:
  *  - General: currency and the day the pay cycle starts (each opens a small picker).
  *  - Appearance: System, Light or Dark.
- *  - Data: the category and merchant manager, and backup export and import.
+ *  - Data: the category and merchant manager, Excel export, and backup export and import.
  *  - Account: log out.
  *
  * Choices are saved as soon as they are made. Importing asks for confirmation first, because it
@@ -86,10 +90,12 @@ fun SettingsScreen(
     onManage: () -> Unit,
     onLogout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
-    backupViewModel: BackupViewModel = hiltViewModel()
+    backupViewModel: BackupViewModel = hiltViewModel(),
+    reportViewModel: ReportViewModel = hiltViewModel()
 ) {
     val settings by viewModel.uiState.collectAsState()
     val backup by backupViewModel.uiState.collectAsState()
+    val report by reportViewModel.uiState.collectAsState()
     val wallet = MaterialTheme.wallet
     var dialog by rememberSaveable { mutableStateOf(SettingsDialog.NONE) }
 
@@ -101,6 +107,23 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) backupViewModel.onEvent(BackupEvent.RequestImport(uri.toString())) }
+
+    // The folder picker for automatic backups. The app keeps access to the chosen folder, so later
+    // backups need no prompt.
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri -> if (uri != null) backupViewModel.onEvent(BackupEvent.EnableAutoBackup(uri.toString())) }
+
+    // The year chosen for the Excel export, remembered while the file picker is open.
+    var reportYear by rememberSaveable { mutableStateOf<Int?>(null) }
+    val reportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(XLSX_MIME_TYPE)
+    ) { uri ->
+        val year = reportYear
+        if (uri != null && year != null) {
+            reportViewModel.onEvent(ReportEvent.ExportYear(year, uri.toString()))
+        }
+    }
 
     val lastBackupText = backup.lastBackupAt?.let {
         "Last backup: " + Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
@@ -185,6 +208,28 @@ fun SettingsScreen(
                 )
                 SettingsDivider()
                 SettingsRow(
+                    title = "Export to Excel",
+                    subtitle = "A yearly report by category and month. To read, not a backup",
+                    enabled = !report.isBusy,
+                    onClick = { dialog = SettingsDialog.REPORT_YEAR }
+                )
+                report.message?.let { message ->
+                    SettingsDivider()
+                    MessageRow(
+                        message = message,
+                        isError = report.isError,
+                        onDismiss = { reportViewModel.onEvent(ReportEvent.DismissMessage) }
+                    )
+                }
+                SettingsDivider()
+                SettingsRow(
+                    title = "Automatic backup",
+                    subtitle = autoBackupSubtitle(backup.autoBackup, backup.lastBackupAt),
+                    enabled = !backup.isBusy,
+                    onClick = { dialog = SettingsDialog.AUTO_BACKUP }
+                )
+                SettingsDivider()
+                SettingsRow(
                     title = "Export backup",
                     subtitle = lastBackupText,
                     enabled = !backup.isBusy,
@@ -199,22 +244,11 @@ fun SettingsScreen(
                 )
                 backup.message?.let { message ->
                     SettingsDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (backup.isError) MaterialTheme.colorScheme.error else wallet.text,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { backupViewModel.onEvent(BackupEvent.DismissMessage) }) {
-                            Text("OK")
-                        }
-                    }
+                    MessageRow(
+                        message = message,
+                        isError = backup.isError,
+                        onDismiss = { backupViewModel.onEvent(BackupEvent.DismissMessage) }
+                    )
                 }
             }
 
@@ -241,6 +275,27 @@ fun SettingsScreen(
             },
             onDismiss = { dialog = SettingsDialog.NONE }
         )
+        SettingsDialog.REPORT_YEAR -> YearPickerDialog(
+            years = report.years,
+            onSelect = { year ->
+                reportYear = year
+                dialog = SettingsDialog.NONE
+                reportLauncher.launch("personal-wallot-$year.xlsx")
+            },
+            onDismiss = { dialog = SettingsDialog.NONE }
+        )
+        SettingsDialog.AUTO_BACKUP -> AutoBackupDialog(
+            status = backup.autoBackup,
+            onChooseFolder = {
+                dialog = SettingsDialog.NONE
+                folderLauncher.launch(null)
+            },
+            onTurnOff = {
+                dialog = SettingsDialog.NONE
+                backupViewModel.onEvent(BackupEvent.DisableAutoBackup)
+            },
+            onDismiss = { dialog = SettingsDialog.NONE }
+        )
         SettingsDialog.NONE -> Unit
     }
 
@@ -262,6 +317,106 @@ fun SettingsScreen(
             }
         )
     }
+}
+
+/** The settings row's second line: whether automatic backup is on, where, and any problem. */
+private fun autoBackupSubtitle(status: AutoBackupStatus, lastBackupAt: Long?): String = when {
+    !status.enabled -> "Off. Saves a copy to a folder you choose after every change"
+    status.lastError != null -> "Problem: ${status.lastError}"
+    else -> {
+        val folder = status.folderName?.let { "Saving to \"$it\"" } ?: "On"
+        val last = lastBackupAt?.let {
+            ". Last: " + Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("d MMM, HH:mm"))
+        }.orEmpty()
+        folder + last
+    }
+}
+
+/**
+ * Explains automatic backup and lets the user choose the folder, change it, or turn it off. The
+ * folder is picked with the system picker, which is what lets the app write there later without
+ * asking again.
+ */
+@Composable
+private fun AutoBackupDialog(
+    status: AutoBackupStatus,
+    onChooseFolder: () -> Unit,
+    onTurnOff: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (status.enabled) "Automatic backup is on" else "Automatic backup") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Shortly after you add, edit or delete anything, the app saves a fresh backup " +
+                        "file to the folder you choose and keeps the last 14 days."
+                )
+                Text(
+                    "Choose a folder that is private to you: the files are not encrypted, so " +
+                        "anyone who can open the folder can read them. For a copy that survives " +
+                        "losing this phone, pick a folder that syncs to a computer or cloud.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.wallet.muted
+                )
+                status.lastError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onChooseFolder) { Text(if (status.enabled) "Change folder" else "Choose folder") }
+        },
+        dismissButton = {
+            if (status.enabled) TextButton(onClick = onTurnOff) { Text("Turn off") }
+            else TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+/** One line of feedback (for example the result of an export) with an OK button to dismiss it. */
+@Composable
+private fun MessageRow(message: String, isError: Boolean, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.wallet.text,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onDismiss) { Text("OK") }
+    }
+}
+
+/** Lists the years that can be exported, newest first; choosing one continues to the file picker. */
+@Composable
+private fun YearPickerDialog(years: List<Int>, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export which year?") },
+        text = {
+            LazyColumn {
+                items(years) { year ->
+                    Text(
+                        text = year.toString(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button) { onSelect(year) }
+                            .padding(vertical = 14.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 /** A titled group of settings drawn as one rounded card. */

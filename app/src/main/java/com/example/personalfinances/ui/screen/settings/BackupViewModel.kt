@@ -2,8 +2,12 @@ package com.example.personalfinances.ui.screen.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.personalfinances.domain.model.AutoBackupStatus
 import com.example.personalfinances.domain.model.BackupResult
+import com.example.personalfinances.domain.usecase.backup.DisableAutoBackupUseCase
+import com.example.personalfinances.domain.usecase.backup.EnableAutoBackupUseCase
 import com.example.personalfinances.domain.usecase.backup.ExportBackupUseCase
+import com.example.personalfinances.domain.usecase.backup.GetAutoBackupStatusUseCase
 import com.example.personalfinances.domain.usecase.backup.GetLastBackupUseCase
 import com.example.personalfinances.domain.usecase.backup.ImportBackupUseCase
 import com.example.personalfinances.domain.usecase.transaction.GetFirstTransactionDateUseCase
@@ -42,7 +46,8 @@ private fun reminderFor(lastBackupAt: Long?, hasData: Boolean): BackupReminder? 
  * milliseconds, null if never); [message] is the result line after an export or import
  * ([isError] marks a failure); [pendingImport] holds a chosen file awaiting the user's
  * confirmation; [reminder] is non-null when the user should be nudged to back up, unless they
- * chose Later ([reminderDismissed]) for this session.
+ * chose Later ([reminderDismissed]) for this session. [autoBackup] is the state of automatic
+ * backup (on or off, its folder, and the last failure).
  */
 data class BackupUiState(
     val lastBackupAt: Long? = null,
@@ -51,7 +56,8 @@ data class BackupUiState(
     val isError: Boolean = false,
     val pendingImport: String? = null,
     val reminder: BackupReminder? = null,
-    val reminderDismissed: Boolean = false
+    val reminderDismissed: Boolean = false,
+    val autoBackup: AutoBackupStatus = AutoBackupStatus()
 )
 
 /** User actions for backup and restore. */
@@ -62,6 +68,10 @@ sealed class BackupEvent {
     object CancelImport : BackupEvent()
     object DismissMessage : BackupEvent()
     object DismissReminder : BackupEvent()
+
+    /** Turn automatic backup on, saving to the folder at [folder] (from the system folder picker). */
+    data class EnableAutoBackup(val folder: String) : BackupEvent()
+    object DisableAutoBackup : BackupEvent()
 }
 
 /**
@@ -73,6 +83,9 @@ sealed class BackupEvent {
 class BackupViewModel @Inject constructor(
     private val exportBackupUseCase: ExportBackupUseCase,
     private val importBackupUseCase: ImportBackupUseCase,
+    private val enableAutoBackupUseCase: EnableAutoBackupUseCase,
+    private val disableAutoBackupUseCase: DisableAutoBackupUseCase,
+    getAutoBackupStatusUseCase: GetAutoBackupStatusUseCase,
     getLastBackupUseCase: GetLastBackupUseCase,
     getFirstTransactionDateUseCase: GetFirstTransactionDateUseCase
 ) : ViewModel() {
@@ -85,6 +98,10 @@ class BackupViewModel @Inject constructor(
             lastBackupAt to reminderFor(lastBackupAt = lastBackupAt, hasData = firstDate != null)
         }.onEach { (lastBackupAt, reminder) ->
             _uiState.update { it.copy(lastBackupAt = lastBackupAt, reminder = reminder) }
+        }.launchIn(viewModelScope)
+
+        getAutoBackupStatusUseCase().onEach { status ->
+            _uiState.update { it.copy(autoBackup = status) }
         }.launchIn(viewModelScope)
     }
 
@@ -101,6 +118,24 @@ class BackupViewModel @Inject constructor(
             }
             BackupEvent.DismissMessage -> _uiState.update { it.copy(message = null) }
             BackupEvent.DismissReminder -> _uiState.update { it.copy(reminderDismissed = true) }
+            is BackupEvent.EnableAutoBackup -> viewModelScope.launch {
+                _uiState.update { it.copy(isBusy = true, message = null) }
+                val result = enableAutoBackupUseCase(event.folder)
+                _uiState.update {
+                    it.copy(
+                        isBusy = false,
+                        message = when (result) {
+                            is BackupResult.Success -> "Automatic backup is on. First backup saved."
+                            is BackupResult.Failure -> result.message
+                        },
+                        isError = result is BackupResult.Failure
+                    )
+                }
+            }
+            BackupEvent.DisableAutoBackup -> viewModelScope.launch {
+                disableAutoBackupUseCase()
+                _uiState.update { it.copy(message = "Automatic backup is off.", isError = false) }
+            }
         }
     }
 

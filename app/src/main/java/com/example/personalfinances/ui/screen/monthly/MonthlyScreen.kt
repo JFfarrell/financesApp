@@ -59,7 +59,7 @@ import com.example.personalfinances.ui.screen.transaction.AddTransactionBottomSh
 import com.example.personalfinances.ui.theme.wallet
 import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 import com.example.personalfinances.util.MoneyFormatter
-import com.example.personalfinances.util.DateUtils
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
@@ -100,8 +100,6 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             }
         }
     }
-
-    val defaultDate = DateUtils.monthDateRange(uiState.selectedMonth, uiState.payCycleStartDay).first
 
     // One-off and recurring transactions are shown together, grouped by day.
     val byDay = (uiState.transactions + uiState.recurringTransactions)
@@ -193,7 +191,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         AddTransactionBottomSheet(
             initialTransaction = uiState.transactionSheetTarget,
             defaultType = uiState.sheetDefaultType,
-            defaultDate = defaultDate,
+            defaultDate = LocalDate.now(),
             categories = uiState.categories,
             onCreateCategory = { viewModel.onEvent(CalendarEvent.AddCategory(it)) },
             merchants = uiState.merchants,

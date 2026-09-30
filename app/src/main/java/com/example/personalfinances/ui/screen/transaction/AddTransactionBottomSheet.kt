@@ -108,7 +108,7 @@ private enum class DetailEditor { MERCHANT, NOTES, TAGS, REPEAT }
  *
  * @param initialTransaction Transaction to edit, or null for Add mode.
  * @param defaultType Type pre-selected in Add mode.
- * @param defaultDate Date pre-filled in Add mode (first day of the selected month).
+ * @param defaultDate Date pre-filled in Add mode (today, whichever month is being viewed).
  * @param categories Categories available to pick from.
  * @param onCreateCategory Called with a newly created category so it can be saved.
  * @param merchants Merchants available to pick from.

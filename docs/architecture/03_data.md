@@ -11,6 +11,8 @@ graph TD
         CRI ~~~ MRI["MerchantRepositoryImpl"]
         MRI ~~~ SGRI["SavingsGoalRepositoryImpl"]
         SGRI ~~~ BRI["BackupRepositoryImpl"]
+        BRI ~~~ RRI["ReportRepositoryImpl"]
+        RRI ~~~ ABS["AutoBackupScheduler and Worker"]
     end
 
     subgraph Mappers["Mappers"]
@@ -47,6 +49,9 @@ graph TD
     CRI --> CM
     MRI --> MD
     MRI --> MM
+    RRI --> XW["AnnualReportWorkbook and XlsxWriter"]
+    ABS --> BD
+    ABS --> BRI
     BRI --> BD
     BRI --> BF["BackupFile - JSON"]
     SGRI --> SGD
@@ -81,4 +86,6 @@ graph TD
 
 - `Converters` is a concrete class registered with `@TypeConverters` on `AppDatabase`. It cannot be `AppDatabase` itself because Room instantiates the converter class and `AppDatabase` is abstract.
 - There is no destructive-migration fallback. Version 9 is the baseline; later schema changes need migrations and a `MigrationTest`.
+- `AutoBackupScheduler` watches the data tables and queues an `AutoBackupWorker` (WorkManager) after changes; the worker calls `BackupRepositoryImpl.runAutoBackup`, which writes a dated file into the user's chosen folder through `BackupFolder` (Storage Access Framework) and prunes old ones (`AutoBackupNaming`).
+- `XlsxWriter` writes Excel files with no library (an .xlsx is a zip of XML); `AnnualReportWorkbook` lays out the five sheets of the user's budget template (Setup, Expenses, Income, Summary, Spendings), with Expenses holding recurring expenses and Spendings the once-off ones, `XlsxStyleSheet` generates their styles and `ReportFormats` the currency formats. All plain Kotlin with unit tests.
 - `BackupDao` does bulk reads and `@Upsert` writes for backup and restore only. Backups use their own JSON shapes (`BackupFile`), separate from the Room entities, so the database can change without breaking old backups.

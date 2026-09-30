@@ -13,7 +13,14 @@ import java.util.Locale
  */
 class MoneyFormatter(val currency: Currency) {
     private val numberFormat: NumberFormat =
-        NumberFormat.getCurrencyInstance(Locale.getDefault()).also { it.currency = currency }
+        NumberFormat.getCurrencyInstance(Locale.getDefault()).also {
+            it.currency = currency
+            // setCurrency changes the symbol but not the decimal places, which would otherwise
+            // stay those of the phone's own currency (showing yen as "1,500.00").
+            val digits = currency.defaultFractionDigits.coerceAtLeast(0)
+            it.minimumFractionDigits = digits
+            it.maximumFractionDigits = digits
+        }
 
     /** Formats [amount], for example "€1,234.50" (fraction digits follow the currency). */
     fun format(amount: Double): String = numberFormat.format(amount)

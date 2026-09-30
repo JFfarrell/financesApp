@@ -28,6 +28,8 @@ class SettingsDataStore @Inject constructor(
         val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         val LAST_BACKUP_AT_KEY = longPreferencesKey("last_backup_at")
         val CURRENCY_CODE_KEY = stringPreferencesKey("currency_code")
+        val AUTO_BACKUP_FOLDER_KEY = stringPreferencesKey("auto_backup_folder")
+        val AUTO_BACKUP_ERROR_KEY = stringPreferencesKey("auto_backup_error")
     }
 
     val payCycleStartDay: Flow<Int> = dataStore.data.map { it[PAY_CYCLE_START_DAY_KEY] ?: 1 }
@@ -55,6 +57,24 @@ class SettingsDataStore @Inject constructor(
     suspend fun saveCurrencyCode(code: String?) {
         dataStore.edit { prefs ->
             if (code == null) prefs.remove(CURRENCY_CODE_KEY) else prefs[CURRENCY_CODE_KEY] = code
+        }
+    }
+
+    /** Emits the address of the folder automatic backups go to, or null when they are off. */
+    val autoBackupFolder: Flow<String?> = dataStore.data.map { it[AUTO_BACKUP_FOLDER_KEY] }
+
+    suspend fun saveAutoBackupFolder(folder: String?) {
+        dataStore.edit { prefs ->
+            if (folder == null) prefs.remove(AUTO_BACKUP_FOLDER_KEY) else prefs[AUTO_BACKUP_FOLDER_KEY] = folder
+        }
+    }
+
+    /** Emits why the last automatic backup failed, or null when it did not fail. */
+    val autoBackupError: Flow<String?> = dataStore.data.map { it[AUTO_BACKUP_ERROR_KEY] }
+
+    suspend fun saveAutoBackupError(message: String?) {
+        dataStore.edit { prefs ->
+            if (message == null) prefs.remove(AUTO_BACKUP_ERROR_KEY) else prefs[AUTO_BACKUP_ERROR_KEY] = message
         }
     }
 

@@ -3,6 +3,7 @@ package com.example.personalfinances.data.local.db.dao
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
 import com.example.personalfinances.data.local.db.entity.CategoryEntity
 import com.example.personalfinances.data.local.db.entity.MerchantEntity
 import com.example.personalfinances.data.local.db.entity.SavingsGoalEntity
@@ -29,6 +30,21 @@ interface BackupDao {
 
     @Query("SELECT * FROM savings_goals WHERE id = 1 LIMIT 1")
     suspend fun savingsGoal(): SavingsGoalEntity?
+
+    // The four queries below exist only to signal that something changed. Room re-runs a query, and
+    // so re-emits, whenever its table is written, even if the result is the same, which is what the
+    // automatic backup relies on. The first emission on subscribing is just the current state.
+    @Query("SELECT COUNT(*) FROM transactions")
+    fun transactionChanges(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM categories")
+    fun categoryChanges(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM merchants")
+    fun merchantChanges(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM savings_goals")
+    fun savingsGoalChanges(): Flow<Int>
 
     @Upsert
     suspend fun upsertCategories(items: List<CategoryEntity>)

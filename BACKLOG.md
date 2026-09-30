@@ -31,11 +31,13 @@ Replaced the flat user-managed `categories` system with a two-level predefined h
 ---
 
 ### 4. Export
-**Status:** To do
+**Status:** Done (needs on-device check)
 
 Export action (from Dashboard or a menu) that generates a CSV mirroring the spreadsheet: income, expenses and savings by category across months, totals. This is a report, not a backup: the monthly grid loses dates, merchants and tags (see the backup and restore discussion). Delivered via Android `FileProvider` + share intent. No schema changes.
 
-**Complexity:** Medium — self-contained, no schema changes. Best done last.
+Done: Settings, Data, "Export to Excel" writes a real .xlsx for a chosen year in the shape of the reference spreadsheet (Setup, Expenses = recurring expenses only, Income, Summary with chart, Spendings = once-off expenses; same cell positions) with a modern generated look, live formulas and the user's currency. The starting balance is the app's savings at the start of the year (savings starting amount plus earlier savings). Months follow the pay-cycle start day. Not verified in Excel itself (only structure is unit-tested): open a real export in Excel, LibreOffice and Google Sheets and report anything odd. Known differences from the original: one expense group ("Recurring") because the app has no groups; cell comments and the Google-Sheets-only formulas (UNIQUE, INDIRECT) are replaced by direct references. Possible later: category groups, a custom date range, an all-years workbook.
+
+**Complexity:** Medium — self-contained, no schema changes.
 
 ---
 
@@ -284,6 +286,18 @@ Preparation for using the app permanently.
 - [x] Backup logic split into `BackupViewModel`, shared by Home (reminder) and Settings; `DashboardViewModel` slimmed down
 - [x] Unit tests for money formatting and for the backup import rules
 - [ ] Possible: per-transaction or per-account currencies (not supported: one currency for all amounts)
+
+---
+
+### 24. Automatic Backup
+**Status:** Done (needs on-device check)
+
+- [x] Settings, Data, "Automatic backup": choose a folder once; a backup is saved there about 20 seconds after data changes (bursts collapse into one), even if the app is closed (WorkManager)
+- [x] One dated file per day, newest 14 kept; only its own files are ever deleted
+- [x] Failures shown in Settings; the Home reminder returns if backups stop working
+- [x] Unit tests for naming and pruning (`AutoBackupNamingTest`)
+- [ ] On-device checks: turn it on, add and delete a transaction, wait, and confirm the file appears and updates; turn it off; pick a folder that syncs to a computer or cloud
+- [ ] Possible later: encrypt the files with a passphrase; notify on repeated failure; back up on a schedule even without changes
 
 ---
 

@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.personalfinances.domain.model.Category
 import com.example.personalfinances.domain.model.Merchant
 import com.example.personalfinances.domain.model.Transaction
-import com.example.personalfinances.domain.model.enums.CadenceUnit
 import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.domain.usecase.category.AddCategoryUseCase
 import com.example.personalfinances.domain.usecase.category.GetCategoriesUseCase
@@ -20,6 +19,7 @@ import com.example.personalfinances.domain.usecase.transaction.GetTransactionsBy
 import com.example.personalfinances.domain.usecase.transaction.UpdateTransactionSeriesUseCase
 import com.example.personalfinances.domain.usecase.transaction.UpdateTransactionUseCase
 import com.example.personalfinances.util.DateUtils
+import com.example.personalfinances.util.Recurrence
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
@@ -178,17 +177,6 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    /** Returns [base] moved forward by [steps] cadence intervals of [unit], each [value] long. */
-    private fun advance(base: LocalDate, unit: CadenceUnit, value: Int, steps: Int): LocalDate {
-        val amount = (value * steps).toLong()
-        return when (unit) {
-            CadenceUnit.DAYS -> base.plusDays(amount)
-            CadenceUnit.WEEKS -> base.plusWeeks(amount)
-            CadenceUnit.MONTHS -> base.plusMonths(amount)
-            CadenceUnit.YEARS -> base.plusYears(amount)
-        }
-    }
-
     /** Deletes one transaction and offers to undo it. */
     private suspend fun deleteOne(transaction: Transaction) {
         deleteTransactionUseCase(transaction)
@@ -222,16 +210,15 @@ class CalendarViewModel @Inject constructor(
                 val transaction = event.transaction
                 if (transaction.isRecurring && event.durationMonths > 1) {
                     val groupId = UUID.randomUUID().toString()
-                    val cadence = transaction.cadenceValue.coerceAtLeast(1)
-                    repeat(event.durationMonths) { i ->
+                    // Every date is counted from the first, so the original day is kept.
+                    val dates = Recurrence.dates(
+                        transaction.date, transaction.cadenceUnit, transaction.cadenceValue, event.durationMonths
+                    )
+                    dates.forEach { date ->
                         // Every copy needs its own id: inserts use REPLACE, so a shared id would
                         // overwrite the previous copy and leave a single row.
                         addTransactionUseCase(
-                            transaction.copy(
-                                id = UUID.randomUUID().toString(),
-                                recurringGroupId = groupId,
-                                date = advance(transaction.date, transaction.cadenceUnit, cadence, i)
-                            )
+                            transaction.copy(id = UUID.randomUUID().toString(), recurringGroupId = groupId, date = date)
                         )
                     }
                 } else {

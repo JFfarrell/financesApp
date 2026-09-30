@@ -17,4 +17,15 @@ object DateUtils {
         val nextStart = next.atDay(startDay.coerceIn(1, next.lengthOfMonth()))
         return start to nextStart.minusDays(1)
     }
+
+    /**
+     * The pay-cycle month a [date] belongs to, the inverse of [monthDateRange]. A cycle is named
+     * for the month it starts in, so with a start day of 25, 24 Aug belongs to July's cycle
+     * (25 Jul to 24 Aug) and 25 Aug to August's (25 Aug to 24 Sep).
+     */
+    fun cycleMonthOf(date: LocalDate, startDay: Int = 1): YearMonth {
+        val month = YearMonth.from(date)
+        val start = month.atDay(startDay.coerceIn(1, month.lengthOfMonth()))
+        return if (date < start) month.minusMonths(1) else month
+    }
 }

@@ -20,7 +20,14 @@ class MoneyFormatterTest {
     fun formattedAmountCarriesTheChosenCurrencySymbol() {
         val eur = MoneyFormatter.forCode("EUR")
         assertTrue(eur.format(12.5).contains(eur.symbol))
-        assertFalse(MoneyFormatter.forCode("JPY").format(1500.0).contains("."))
+
+        // Without decimals, an amount and the same amount plus a fraction look identical; with
+        // decimals they would differ. (Checking for a "." would be wrong in regions where it is
+        // the thousands separator.)
+        val yen = MoneyFormatter.forCode("JPY")
+        assertEquals(yen.format(1500.0), yen.format(1500.4))
+        val euro = MoneyFormatter.forCode("EUR")
+        assertTrue(euro.format(1500.0) != euro.format(1500.4))
     }
 
     @Test
