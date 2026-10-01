@@ -1,31 +1,79 @@
 package com.example.personalfinances.util
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 
 object DateUtils {
-    /**
-     * Returns the inclusive [start, end] date range for [month], where each period begins on
-     * [startDay] of the calendar month (default 1 = standard calendar month). The end is the day
-     * before the next period starts, matching the repository's inclusive date-range queries.
-     *
-     * Example with startDay = 25: for May 2026 returns May 25 to Jun 24.
-     */
-    fun monthDateRange(month: YearMonth, startDay: Int = 1): Pair<LocalDate, LocalDate> {
-        val start = month.atDay(startDay.coerceIn(1, month.lengthOfMonth()))
-        val next = month.plusMonths(1)
-        val nextStart = next.atDay(startDay.coerceIn(1, next.lengthOfMonth()))
-        return start to nextStart.minusDays(1)
+
+    private fun adjustedStartDate(
+        month: YearMonth,
+        startDay: Int
+    ): LocalDate {
+        val date = month.atDay(
+            startDay.coerceIn(1, month.lengthOfMonth())
+        )
+
+        return when (date.dayOfWeek) {
+            DayOfWeek.SATURDAY -> date.minusDays(1)
+            DayOfWeek.SUNDAY -> date.minusDays(2)
+            else -> date
+        }
     }
 
     /**
-     * The pay-cycle month a [date] belongs to, the inverse of [monthDateRange]. A cycle is named
-     * for the month it starts in, so with a start day of 25, 24 Aug belongs to July's cycle
-     * (25 Jul to 24 Aug) and 25 Aug to August's (25 Aug to 24 Sep).
+     * Returns the inclusive [start, end] date range for [month].
+     *
+     * The cycle is named after the month in which it ENDS.
+     *
+     * Example with startDay = 25:
+     * September = Aug 25 -> Sep 24
+     * October   = Sep 25 -> Oct 24
+     *
+     * If the start day falls on a weekend, it moves backwards to Friday.
+     *
+     * Example:
+     * If Aug 25 is Saturday:
+     * September = Aug 24 (Friday) -> Sep 24
      */
-    fun cycleMonthOf(date: LocalDate, startDay: Int = 1): YearMonth {
+    fun monthDateRange(
+        month: YearMonth,
+        startDay: Int = 1
+    ): Pair<LocalDate, LocalDate> {
+
+        val end = adjustedStartDate(month, startDay).minusDays(1)
+        val previousMonth = month.minusMonths(1)
+        val start = adjustedStartDate(previousMonth, startDay)
+
+        return start to end
+    }
+
+    /**
+     * Returns the pay-cycle month that [date] belongs to.
+     *
+     * The cycle is named after the month in which it ENDS.
+     *
+     * Example with startDay = 25:
+     *
+     * Aug 24 -> August
+     * Aug 25 -> September
+     * Sep 24 -> September
+     * Sep 25 -> October
+     *
+     * If the configured start day falls on a weekend, the start
+     * is moved backwards to the preceding Friday.
+     */
+    fun cycleMonthOf(
+        date: LocalDate,
+        startDay: Int = 1
+    ): YearMonth {
+
         val month = YearMonth.from(date)
-        val start = month.atDay(startDay.coerceIn(1, month.lengthOfMonth()))
-        return if (date < start) month.minusMonths(1) else month
+        val start = adjustedStartDate(month, startDay)
+        return if (date >= start) {
+            month.plusMonths(1)
+        } else {
+            month
+        }
     }
 }
