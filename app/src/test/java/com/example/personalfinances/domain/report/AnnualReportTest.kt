@@ -56,27 +56,28 @@ class AnnualReportTest {
     }
 
     @Test
-    fun aPayCycleIsNamedForTheMonthItStartsIn() {
-        // With a start day of 25, "August" runs 25 Aug to 24 Sep, so 24 Aug is still July's.
+    fun aPayCycleIsNamedForTheMonthItsPaydayLeadsInto() {
+        // With a start day of 25, payday starts the next cycle: "September" runs 25 Aug to 24 Sep,
+        // so 24 Aug is still August's.
         val r = report(
             25,
             tx("Rent", TransactionType.EXPENSE, 100.0, LocalDate.of(2026, 8, 24)),
             tx("Rent", TransactionType.EXPENSE, 200.0, LocalDate.of(2026, 8, 25))
         )
         val months = r.rowsByType.getValue(TransactionType.EXPENSE).single().monthly
-        assertEquals(100.0, months[6], 0.0)   // July
-        assertEquals(200.0, months[7], 0.0)   // August
+        assertEquals(100.0, months[7], 0.0)   // August
+        assertEquals(200.0, months[8], 0.0)   // September
     }
 
     @Test
-    fun earlyJanuaryDatesBelongToThePreviousYearsDecemberCycle() {
-        // With a start day of 25, 2026's December cycle runs 25 Dec 2026 to 24 Jan 2027, and the
-        // year's first cycle starts on 25 Jan 2026, so 24 Jan 2026 belongs to December 2025.
+    fun lateDecemberDatesBelongToNextYearsJanuaryCycle() {
+        // With a start day of 25, 2026's December cycle runs 25 Nov to 24 Dec 2026, so 25 Dec 2026
+        // already starts January 2027's. Likewise 2026's January cycle began on 25 Dec 2025.
         val r = report(
             25,
-            tx("Rent", TransactionType.EXPENSE, 100.0, LocalDate.of(2026, 1, 24)),  // Dec 2025: left out
-            tx("Rent", TransactionType.EXPENSE, 300.0, LocalDate.of(2026, 1, 25)),  // Jan 2026
-            tx("Rent", TransactionType.EXPENSE, 50.0, LocalDate.of(2027, 1, 10))    // Dec 2026
+            tx("Rent", TransactionType.EXPENSE, 300.0, LocalDate.of(2025, 12, 28)), // Jan 2026
+            tx("Rent", TransactionType.EXPENSE, 50.0, LocalDate.of(2026, 12, 24)),  // Dec 2026
+            tx("Rent", TransactionType.EXPENSE, 100.0, LocalDate.of(2026, 12, 25))  // Jan 2027: left out
         )
         val totals = r.monthlyTotals(TransactionType.EXPENSE)
         assertEquals(300.0, totals[0], 0.0)
@@ -106,8 +107,43 @@ class AnnualReportTest {
                 date = date.plusDays(1)
             }
         }
-        assertEquals(YearMonth.of(2026, 7), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 24), 25))
-        assertEquals(YearMonth.of(2026, 8), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 25), 25))
+        assertEquals(YearMonth.of(2026, 8), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 24), 25))
+        assertEquals(YearMonth.of(2026, 9), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 25), 25))
+    }
+
+    @Test
+    fun aStartDayOf1IsACalendarMonthUnlessTheNextOneIsPulledBackByAWeekend() {
+        // 1 Mar 2026 is a Sunday, so February's cycle runs 30 Jan to 26 Feb and March's begins on
+        // Friday 27 Feb. (1 Feb is a Sunday too, so January's cycle is 1 to 29 Jan.)
+        assertEquals(Pair(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 29)), DateUtils.monthDateRange(YearMonth.of(2026, 1), 1))
+        assertEquals(Pair(LocalDate.of(2026, 1, 30), LocalDate.of(2026, 2, 26)), DateUtils.monthDateRange(YearMonth.of(2026, 2), 1))
+        assertEquals(YearMonth.of(2026, 1), DateUtils.cycleMonthOf(LocalDate.of(2026, 1, 29), 1))
+        assertEquals(YearMonth.of(2026, 2), DateUtils.cycleMonthOf(LocalDate.of(2026, 1, 30), 1))
+        assertEquals(YearMonth.of(2026, 2), DateUtils.cycleMonthOf(LocalDate.of(2026, 1, 31), 1))
+        assertEquals(YearMonth.of(2026, 2), DateUtils.cycleMonthOf(LocalDate.of(2026, 2, 26), 1))
+        assertEquals(YearMonth.of(2026, 3), DateUtils.cycleMonthOf(LocalDate.of(2026, 2, 27), 1))
+        // A month with no weekend shift is simply the calendar month.
+        assertEquals(Pair(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30)), DateUtils.monthDateRange(YearMonth.of(2026, 4), 1))
+    }
+
+    @Test
+    fun aPaydayOnThe2ndBeginsThatMonthsCycleEvenWhenRolledBackIntoTheMonthBefore() {
+        // 2 Feb 2025 and 2 Mar 2025 are Sundays, so those paydays roll back to Fridays 31 Jan and
+        // 28 Feb. February's cycle therefore runs 31 Jan to 27 Feb, and January's 2 Jan to 30 Jan.
+        assertEquals(Pair(LocalDate.of(2025, 1, 31), LocalDate.of(2025, 2, 27)), DateUtils.monthDateRange(YearMonth.of(2025, 2), 2))
+        assertEquals(Pair(LocalDate.of(2025, 1, 2), LocalDate.of(2025, 1, 30)), DateUtils.monthDateRange(YearMonth.of(2025, 1), 2))
+        assertEquals(YearMonth.of(2025, 1), DateUtils.cycleMonthOf(LocalDate.of(2025, 1, 30), 2))
+        assertEquals(YearMonth.of(2025, 2), DateUtils.cycleMonthOf(LocalDate.of(2025, 1, 31), 2))
+        assertEquals(YearMonth.of(2025, 2), DateUtils.cycleMonthOf(LocalDate.of(2025, 2, 27), 2))
+        assertEquals(YearMonth.of(2025, 3), DateUtils.cycleMonthOf(LocalDate.of(2025, 2, 28), 2))
+    }
+
+    @Test
+    fun theFifteenthNamesItsOwnMonthAndTheSixteenthTheNext() {
+        // Both cycles begin on Friday 14 Aug 2026 (the 15th and 16th are a weekend), but the one
+        // whose payday is on the 15th leads into August and the one on the 16th into September.
+        assertEquals(YearMonth.of(2026, 8), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 20), 15))
+        assertEquals(YearMonth.of(2026, 9), DateUtils.cycleMonthOf(LocalDate.of(2026, 8, 20), 16))
     }
 
     @Test

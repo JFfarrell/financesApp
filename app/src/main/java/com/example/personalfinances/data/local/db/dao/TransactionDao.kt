@@ -42,6 +42,28 @@ interface TransactionDao {
             WHERE merchant_id IS NOT NULL GROUP BY merchant_id""")
     fun getMerchantUsage(): Flow<List<UsageCount>>
 
+    /**
+     * The date of the latest transaction per merchant, ignoring entries after [today] (future
+     * entries of a recurring series are created in advance and have not really "happened" yet).
+     */
+    @Query("""SELECT merchant_id AS id, MAX(date) AS lastUsed FROM transactions
+            WHERE merchant_id IS NOT NULL AND date <= :today GROUP BY merchant_id""")
+    fun getMerchantLastUsed(today: LocalDate): Flow<List<MerchantLastUsed>>
+
+    /**
+     * The merchants entered most often between [since] and [today], most frequent first (ties go
+     * to the most recent), at most [limit] of them. Recurring entries are left out: they are
+     * generated automatically, so they say nothing about what the user picks by hand.
+     */
+    @Query("""SELECT merchant_id AS id, COUNT(*) AS count FROM transactions
+            WHERE merchant_id IS NOT NULL AND is_recurring = 0 AND date BETWEEN :since AND :today
+            GROUP BY merchant_id ORDER BY count DESC, MAX(date) DESC LIMIT :limit""")
+    fun getFrequentMerchantUsage(since: LocalDate, today: LocalDate, limit: Int): Flow<List<UsageCount>>
+
+    /** Points every transaction of merchant [fromId] at merchant [toId] instead. */
+    @Query("UPDATE transactions SET merchant_id = :toId WHERE merchant_id = :fromId")
+    suspend fun reassignMerchant(fromId: String, toId: String)
+
     /** Every transaction in a recurring series dated on or after [fromDate]. */
     @Query("SELECT * FROM transactions WHERE recurring_group_id = :groupId AND date >= :fromDate")
     suspend fun getSeriesFromDate(groupId: String, fromDate: LocalDate): List<TransactionEntity>

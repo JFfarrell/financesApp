@@ -10,8 +10,11 @@ import com.example.personalfinances.domain.usecase.category.GetCategoriesUseCase
 import com.example.personalfinances.domain.usecase.category.GetCategoryUsageUseCase
 import com.example.personalfinances.domain.usecase.category.RenameCategoryUseCase
 import com.example.personalfinances.domain.usecase.merchant.DeleteMerchantUseCase
+import com.example.personalfinances.domain.usecase.merchant.DeleteUnusedMerchantsUseCase
+import com.example.personalfinances.domain.usecase.merchant.GetMerchantLastUsedUseCase
 import com.example.personalfinances.domain.usecase.merchant.GetMerchantUsageUseCase
 import com.example.personalfinances.domain.usecase.merchant.GetMerchantsUseCase
+import com.example.personalfinances.domain.usecase.merchant.MergeMerchantsUseCase
 import com.example.personalfinances.domain.usecase.merchant.RenameMerchantUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,13 +25,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 /** A category with how many transactions use it. */
 data class ManagedCategory(val category: Category, val usage: Int)
 
-/** A merchant with how many transactions use it. */
-data class ManagedMerchant(val merchant: Merchant, val usage: Int)
+/** A merchant with how many transactions use it and the date of the latest one (null if none yet). */
+data class ManagedMerchant(val merchant: Merchant, val usage: Int, val lastUsed: LocalDate? = null)
 
 /** The category or merchant an edit or delete is about, with its usage at the time it was chosen. */
 sealed class ManageTarget {
@@ -49,7 +53,9 @@ sealed class ManageTarget {
 /**
  * State of the manage screen. [renaming] and [deleting] hold the item a dialog is open for;
  * [renameError] is the reason the last rename was refused (the dialog stays open to show it);
- * [message] is a one-off notice such as why a delete was refused.
+ * [message] is a one-off notice such as why a delete was refused. [merging] is the merchant a
+ * "merge into another" dialog is open for, and [confirmingDeleteUnused] is true while the
+ * "delete all unused merchants" confirmation is showing.
  */
 data class ManageUiState(
     val categories: List<ManagedCategory> = emptyList(),
@@ -57,7 +63,9 @@ data class ManageUiState(
     val renaming: ManageTarget? = null,
     val renameError: String? = null,
     val deleting: ManageTarget? = null,
-    val message: String? = null
+    val message: String? = null,
+    val merging: ManagedMerchant? = null,
+    val confirmingDeleteUnused: Boolean = false
 )
 
 /** User actions on the manage screen. */
@@ -69,12 +77,19 @@ sealed class ManageEvent {
     object ConfirmDelete : ManageEvent()
     object CancelDelete : ManageEvent()
     object DismissMessage : ManageEvent()
+    data class StartMerge(val source: ManagedMerchant) : ManageEvent()
+    data class ConfirmMerge(val target: Merchant) : ManageEvent()
+    object CancelMerge : ManageEvent()
+    object StartDeleteUnused : ManageEvent()
+    object ConfirmDeleteUnused : ManageEvent()
+    object CancelDeleteUnused : ManageEvent()
 }
 
 /**
- * Lets the user rename and delete their categories and merchants. Rules (no blank or duplicate
- * names, nothing in use can be deleted) live in the use cases; this class only drives the dialogs
- * and shows the outcome.
+ * Lets the user rename and delete their categories and merchants, and merge or bulk-delete
+ * merchants. Rules (no blank or duplicate names, nothing in use can be deleted) live in the use
+ * cases; this class only drives the dialogs and shows the outcome. Searching, sorting and the
+ * "unused only" filter are display choices kept by the screen itself.
  */
 @HiltViewModel
 class ManageViewModel @Inject constructor(
@@ -85,7 +100,10 @@ class ManageViewModel @Inject constructor(
     getMerchantsUseCase: GetMerchantsUseCase,
     getMerchantUsageUseCase: GetMerchantUsageUseCase,
     private val renameMerchantUseCase: RenameMerchantUseCase,
-    private val deleteMerchantUseCase: DeleteMerchantUseCase
+    private val deleteMerchantUseCase: DeleteMerchantUseCase,
+    getMerchantLastUsedUseCase: GetMerchantLastUsedUseCase,
+    private val mergeMerchantsUseCase: MergeMerchantsUseCase,
+    private val deleteUnusedMerchantsUseCase: DeleteUnusedMerchantsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ManageUiState())
@@ -100,10 +118,14 @@ class ManageViewModel @Inject constructor(
             _uiState.update { it.copy(categories = list) }
         }.launchIn(viewModelScope)
 
-        combine(getMerchantsUseCase(), getMerchantUsageUseCase()) { merchants, usage ->
+        combine(
+            getMerchantsUseCase(),
+            getMerchantUsageUseCase(),
+            getMerchantLastUsedUseCase()
+        ) { merchants, usage, lastUsed ->
             merchants
                 .sortedBy { it.name.lowercase() }
-                .map { ManagedMerchant(it, usage[it.id] ?: 0) }
+                .map { ManagedMerchant(it, usage[it.id] ?: 0, lastUsed[it.id]) }
         }.onEach { list ->
             _uiState.update { it.copy(merchants = list) }
         }.launchIn(viewModelScope)
@@ -144,6 +166,24 @@ class ManageViewModel @Inject constructor(
                 }
             }
             ManageEvent.DismissMessage -> _uiState.update { it.copy(message = null) }
+            is ManageEvent.StartMerge -> _uiState.update { it.copy(merging = event.source) }
+            ManageEvent.CancelMerge -> _uiState.update { it.copy(merging = null) }
+            is ManageEvent.ConfirmMerge -> viewModelScope.launch {
+                val source = _uiState.value.merging ?: return@launch
+                val result = mergeMerchantsUseCase(source.merchant, event.target)
+                _uiState.update {
+                    it.copy(
+                        merging = null,
+                        message = (result as? OperationResult.Failure)?.message
+                    )
+                }
+            }
+            ManageEvent.StartDeleteUnused -> _uiState.update { it.copy(confirmingDeleteUnused = true) }
+            ManageEvent.CancelDeleteUnused -> _uiState.update { it.copy(confirmingDeleteUnused = false) }
+            ManageEvent.ConfirmDeleteUnused -> viewModelScope.launch {
+                deleteUnusedMerchantsUseCase()
+                _uiState.update { it.copy(confirmingDeleteUnused = false) }
+            }
         }
     }
 }

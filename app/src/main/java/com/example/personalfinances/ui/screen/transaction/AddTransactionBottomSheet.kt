@@ -102,6 +102,10 @@ private enum class DetailEditor { MERCHANT, NOTES, TAGS, REPEAT }
  * works the same way over [merchants]. Typing a name that already exists selects the existing
  * item instead of creating a duplicate. Tags go through [TagInput] and are always lowercase.
  *
+ * The merchant list grows with use, so its picker is searchable (type to filter, or type a new
+ * name and choose "+ Add") and lists [merchants] A–Z. Above it, [frequentMerchants] show as chips
+ * for one-tap selection (tap the chosen one again to clear it).
+ *
  * In Add mode with repeat on, a "For how many months?" field is shown and [onSave] receives the
  * duration so the caller can create the whole series. Only monthly cadence is exposed for now;
  * the model supports other units (see backlog item 13).
@@ -112,6 +116,7 @@ private enum class DetailEditor { MERCHANT, NOTES, TAGS, REPEAT }
  * @param categories Categories available to pick from.
  * @param onCreateCategory Called with a newly created category so it can be saved.
  * @param merchants Merchants available to pick from.
+ * @param frequentMerchants The merchants entered most often lately, offered as quick-pick chips.
  * @param onCreateMerchant Called with a newly created merchant so it can be saved.
  * @param onDismiss Called when the sheet is dismissed without saving.
  * @param onSave Called with the completed [Transaction] and the number of months to create.
@@ -127,7 +132,8 @@ fun AddTransactionBottomSheet(
     merchants: List<Merchant>,
     onCreateMerchant: (Merchant) -> Unit,
     onDismiss: () -> Unit,
-    onSave: (Transaction, durationMonths: Int) -> Unit
+    onSave: (Transaction, durationMonths: Int) -> Unit,
+    frequentMerchants: List<Merchant> = emptyList()
 ) {
     val wallet = MaterialTheme.wallet
     val money = LocalMoneyFormatter.current
@@ -158,6 +164,7 @@ fun AddTransactionBottomSheet(
 
     // Each transaction type has its own categories, so only offer those matching the chosen type.
     val typeCategories = categories.filter { it.type == type }
+    val sortedMerchants = remember(merchants) { merchants.sortedBy { it.name.lowercase() } }
     val amount = amountText.toDoubleOrNull()
     val isSaveEnabled = amount != null && amount > 0.0 && selectedCategory != null
 
@@ -338,26 +345,53 @@ fun AddTransactionBottomSheet(
             }
 
             when (openEditor) {
-                DetailEditor.MERCHANT -> CreatablePicker(
-                    label = "Merchant",
-                    options = merchants,
-                    selected = selectedMerchant,
-                    optionName = { it.name },
-                    newOptionLabel = "+ New merchant",
-                    newNameLabel = "New merchant name",
-                    noneLabel = "None",
-                    onSelected = { selectedMerchant = it },
-                    onCreate = { name ->
-                        val existing = merchants.firstOrNull { it.name.equals(name, ignoreCase = true) }
-                        if (existing != null) {
-                            selectedMerchant = existing
-                        } else {
-                            val created = Merchant(id = UUID.randomUUID().toString(), name = name)
-                            onCreateMerchant(created)
-                            selectedMerchant = created
+                DetailEditor.MERCHANT -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (frequentMerchants.isNotEmpty()) {
+                        Text("Frequent", style = MaterialTheme.typography.labelLarge, color = wallet.muted)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            frequentMerchants.forEach { merchant ->
+                                val isSelected = selectedMerchant?.id == merchant.id
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedMerchant = if (isSelected) null else merchant },
+                                    label = { Text(merchant.name, style = MaterialTheme.typography.labelLarge) },
+                                    shape = CircleShape,
+                                    border = null,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = wallet.cardTonal,
+                                        labelColor = wallet.text,
+                                        selectedContainerColor = wallet.selected,
+                                        selectedLabelColor = wallet.onSelected
+                                    )
+                                )
+                            }
                         }
                     }
-                )
+                    CreatablePicker(
+                        label = "Merchant",
+                        options = sortedMerchants,
+                        selected = selectedMerchant,
+                        optionName = { it.name },
+                        newOptionLabel = "+ New merchant",
+                        newNameLabel = "New merchant name",
+                        noneLabel = "None",
+                        searchable = true,
+                        onSelected = { selectedMerchant = it },
+                        onCreate = { name ->
+                            val existing = merchants.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                            if (existing != null) {
+                                selectedMerchant = existing
+                            } else {
+                                val created = Merchant(id = UUID.randomUUID().toString(), name = name)
+                                onCreateMerchant(created)
+                                selectedMerchant = created
+                            }
+                        }
+                    )
+                }
                 DetailEditor.NOTES -> OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },

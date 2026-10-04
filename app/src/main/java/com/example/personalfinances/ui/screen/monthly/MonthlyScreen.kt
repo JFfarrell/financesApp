@@ -126,7 +126,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             Text(text = "Transactions", style = MaterialTheme.typography.headlineSmall)
             IconButton(
                 onClick = {
-                    viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(TransactionType.EXPENSE))
+                    viewModel.onEvent(CalendarEvent.ShowAddTransactionSheet(filter.type ?: TransactionType.EXPENSE))
                 },
                 modifier = Modifier.size(44.dp),
                 colors = IconButtonDefaults.iconButtonColors(
@@ -195,6 +195,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             categories = uiState.categories,
             onCreateCategory = { viewModel.onEvent(CalendarEvent.AddCategory(it)) },
             merchants = uiState.merchants,
+            frequentMerchants = uiState.frequentMerchants,
             onCreateMerchant = { viewModel.onEvent(CalendarEvent.AddMerchant(it)) },
             onDismiss = { viewModel.onEvent(CalendarEvent.HideTransactionSheet) },
             onSave = { transaction, durationMonths ->

@@ -9,6 +9,7 @@ import com.example.personalfinances.domain.model.enums.TransactionType
 import com.example.personalfinances.domain.usecase.category.AddCategoryUseCase
 import com.example.personalfinances.domain.usecase.category.GetCategoriesUseCase
 import com.example.personalfinances.domain.usecase.merchant.AddMerchantUseCase
+import com.example.personalfinances.domain.usecase.merchant.GetFrequentMerchantsUseCase
 import com.example.personalfinances.domain.usecase.merchant.GetMerchantsUseCase
 import com.example.personalfinances.domain.usecase.settings.GetPayCycleStartDayUseCase
 import com.example.personalfinances.domain.usecase.transaction.AddTransactionUseCase
@@ -51,7 +52,8 @@ sealed class RecurringDialogState {
  * [transactionSheetTarget] is null when the sheet is in Add mode, or holds the transaction being
  * edited. In Add mode, [sheetDefaultType] is the type the sheet should pre-select.
  *
- * [categories] and [merchants] feed the pickers in the transaction sheet.
+ * [categories] and [merchants] feed the pickers in the transaction sheet, and [frequentMerchants]
+ * are the merchants entered most often lately, offered there as one-tap chips.
  *
  * [recurringDialog] is non-None when a recurring-scope prompt is waiting for user input.
  *
@@ -68,6 +70,7 @@ data class CalendarUiState(
     val sheetDefaultType: TransactionType = TransactionType.EXPENSE,
     val categories: List<Category> = emptyList(),
     val merchants: List<Merchant> = emptyList(),
+    val frequentMerchants: List<Merchant> = emptyList(),
     val recurringDialog: RecurringDialogState = RecurringDialogState.None,
     val undoDelete: PendingUndo? = null
 )
@@ -136,7 +139,8 @@ class CalendarViewModel @Inject constructor(
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val addCategoryUseCase: AddCategoryUseCase,
     private val getMerchantsUseCase: GetMerchantsUseCase,
-    private val addMerchantUseCase: AddMerchantUseCase
+    private val addMerchantUseCase: AddMerchantUseCase,
+    getFrequentMerchantsUseCase: GetFrequentMerchantsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -156,6 +160,10 @@ class CalendarViewModel @Inject constructor(
 
         getMerchantsUseCase().onEach { merchants ->
             _uiState.update { it.copy(merchants = merchants) }
+        }.launchIn(viewModelScope)
+
+        getFrequentMerchantsUseCase().onEach { frequent ->
+            _uiState.update { it.copy(frequentMerchants = frequent) }
         }.launchIn(viewModelScope)
     }
 

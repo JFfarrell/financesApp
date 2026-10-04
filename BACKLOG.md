@@ -272,7 +272,12 @@ Preparation for using the app permanently.
 - [x] Undo after deleting a transaction or a "this and future" series (restores the whole set)
 - [x] Backup reminder card on Home (no backup yet, or last backup 14 or more days ago), with "Back up now" and "Later"
 - [x] Manage screen (Settings, Data, then "Categories & merchants"): rename and delete, with usage counts. Blank and duplicate names refused; items in use cannot be deleted.
-- [ ] Merge two categories or merchants (move a category's transactions to another, then delete it)
+- [x] Merge merchants (Manage, Merchants, merge icon on a row: its transactions move to the merchant you pick, then it is deleted; one database transaction)
+- [ ] Merge two categories (the same idea, within one transaction type)
+- [x] Merchants list scales: search box, sort (A–Z, Most used, Recent), "Unused" filter with a "Delete all unused" clean-up, and last-used date on each row
+- [x] Add sheet merchant picker is type-to-filter (type a new name and choose "+ Add"), lists A–Z, and shows the most frequent recent merchants (last 90 days, recurring entries ignored) as one-tap chips
+- [x] Unit tests for the merchant search, filter and sort (`MerchantListOptionsTest`)
+- [ ] On-device checks: merge two merchants and confirm the transactions follow; type-to-add in the add sheet; the Frequent chips; "Delete all unused"
 - [ ] Undo for other destructive actions (deleting a category or merchant is not undoable, but is only allowed when unused)
 
 ---
