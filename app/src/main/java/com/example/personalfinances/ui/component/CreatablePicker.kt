@@ -32,6 +32,13 @@ import androidx.compose.ui.unit.dp
  * If [noneLabel] is set, an extra entry with that label is shown first and selecting it calls
  * [onSelected] with null, for optional fields such as merchant.
  *
+ * With [searchable] the field becomes a type-to-filter box, which suits long lists: opening it
+ * clears the text so the user can start typing at once, the options narrow to those containing
+ * what was typed (ignoring case), and when the text matches no existing option the menu offers
+ * `+ Add "text"`, so creating takes the same single step as choosing. The separate "new" entry and
+ * name field are not used in this mode, and closing the menu without choosing restores the
+ * current selection's name.
+ *
  * @param label Text shown as the field label.
  * @param options Items the user can pick from.
  * @param selected Currently selected item, or null when nothing is chosen.
@@ -41,6 +48,7 @@ import androidx.compose.ui.unit.dp
  * @param onSelected Called with the chosen item, or null when "None" is chosen.
  * @param onCreate Called with the trimmed name the user typed to create a new item.
  * @param noneLabel Label for the clear-selection entry, or null to hide it.
+ * @param searchable Whether to filter the options as the user types and create from the typed text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,21 +62,57 @@ fun <T> CreatablePicker(
     onSelected: (T?) -> Unit,
     onCreate: (String) -> Unit,
     modifier: Modifier = Modifier,
-    noneLabel: String? = null
+    noneLabel: String? = null,
+    searchable: Boolean = false
 ) {
     var expanded by remember { mutableStateOf(false) }
     var isCreating by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
 
+    // Searchable mode only: the text in the box, and whether it is a search (as opposed to just
+    // showing the current selection's name). A new selection resets the text to its name.
+    val selectedName = selected?.let(optionName) ?: ""
+    var query by remember(selected) { mutableStateOf(selectedName) }
+    var isFiltering by remember(selected) { mutableStateOf(false) }
+    val typed = query.trim()
+    val visibleOptions =
+        if (searchable && isFiltering) options.filter { optionName(it).contains(typed, ignoreCase = true) }
+        else options
+    val canCreateFromQuery = searchable && isFiltering && typed.isNotEmpty() &&
+        options.none { optionName(it).equals(typed, ignoreCase = true) }
+
+    fun closeMenu() {
+        expanded = false
+        query = selectedName
+        isFiltering = false
+    }
+
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ExposedDropdownMenuBox(
             expanded = expanded,
-            onExpandedChange = { expanded = it }
+            onExpandedChange = { open ->
+                if (open) {
+                    expanded = true
+                    if (searchable) query = ""
+                } else {
+                    closeMenu()
+                }
+            }
         ) {
             OutlinedTextField(
-                value = selected?.let(optionName) ?: "",
-                onValueChange = {},
-                readOnly = true,
+                value = if (searchable) query else selectedName,
+                onValueChange = {
+                    if (searchable) {
+                        query = it
+                        isFiltering = true
+                        expanded = true
+                    }
+                },
+                readOnly = !searchable,
+                placeholder = if (searchable) {
+                    { Text("Search or type a new name") }
+                } else null,
+                singleLine = searchable,
                 label = { Text(label) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier
@@ -77,36 +121,48 @@ fun <T> CreatablePicker(
             )
             ExposedDropdownMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false }
+                onDismissRequest = { closeMenu() }
             ) {
-                if (noneLabel != null) {
+                if (noneLabel != null && !isFiltering) {
                     DropdownMenuItem(
                         text = { Text(noneLabel) },
                         onClick = {
                             onSelected(null)
                             isCreating = false
-                            expanded = false
+                            closeMenu()
                         }
                     )
                 }
-                options.forEach { option ->
+                visibleOptions.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(optionName(option)) },
                         onClick = {
                             onSelected(option)
                             isCreating = false
+                            closeMenu()
+                        }
+                    )
+                }
+                if (searchable) {
+                    if (canCreateFromQuery) {
+                        DropdownMenuItem(
+                            text = { Text("+ Add \"$typed\"") },
+                            onClick = {
+                                onCreate(typed)
+                                closeMenu()
+                            }
+                        )
+                    }
+                } else {
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(newOptionLabel) },
+                        onClick = {
+                            isCreating = true
                             expanded = false
                         }
                     )
                 }
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text(newOptionLabel) },
-                    onClick = {
-                        isCreating = true
-                        expanded = false
-                    }
-                )
             }
         }
 
