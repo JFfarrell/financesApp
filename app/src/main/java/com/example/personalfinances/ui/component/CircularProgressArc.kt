@@ -9,8 +9,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.personalfinances.ui.theme.NeutralGray
+import com.example.personalfinances.ui.theme.wallet
 
+/**
+ * A circular progress ring: a muted full-circle track with a rounded arc drawn over it for
+ * [progressFraction] (0 to 1), in the theme's savings colour.
+ */
 @Composable
 fun CircularProgressArc(
     progressFraction: Float,
@@ -18,7 +22,8 @@ fun CircularProgressArc(
     size: Dp = 180.dp,
     strokeWidth: Dp = 16.dp
 ) {
-    val primary = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.wallet.cardTonal
+    val progress = MaterialTheme.wallet.saving
 
     Canvas(modifier = modifier.size(size)) {
         val strokePx = strokeWidth.toPx()
@@ -26,7 +31,7 @@ fun CircularProgressArc(
 
         // Background track
         drawArc(
-            color = NeutralGray,
+            color = track,
             startAngle = -90f,
             sweepAngle = 360f,
             useCenter = false,
@@ -36,7 +41,7 @@ fun CircularProgressArc(
         // Progress arc
         if (progressFraction > 0f) {
             drawArc(
-                color = primary,
+                color = progress,
                 startAngle = -90f,
                 sweepAngle = progressFraction * 360f,
                 useCenter = false,

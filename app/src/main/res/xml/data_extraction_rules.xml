@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup and transfer rules for Android 12 and above. Everything in the app's data directory
+  (including the Room database) is included by default; only the entries below are left out.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Holds the password hash; do not copy it into cloud backups. -->
+        <exclude domain="file" path="datastore/auth_prefs.preferences_pb" />
+    </cloud-backup>
+    <!-- Device-to-device transfer keeps everything, so a new phone opens straight in. -->
+</data-extraction-rules>

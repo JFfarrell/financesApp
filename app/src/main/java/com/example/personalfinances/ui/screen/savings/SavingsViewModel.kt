@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.personalfinances.domain.model.SavingsGoal
 import com.example.personalfinances.domain.usecase.savings.GetSavingsGoalUseCase
-import com.example.personalfinances.domain.usecase.savings.GetSavingsTotalUseCase
+import com.example.personalfinances.domain.usecase.transaction.GetSavingsTotalUseCase
 import com.example.personalfinances.domain.usecase.savings.UpdateSavingsGoalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +20,12 @@ import javax.inject.Inject
  *
  * The key responsibility here is deriving [SavingsUiState.currentSaved] reactively. Rather than
  * trusting a manually-entered value, it is computed as:
- *   currentSaved = goal.startingAmount + savingsExpensesTotal
+ *   currentSaved = goal.startingAmount + savingsTotal
  *
  * This is achieved by combining two flows with [combine]: the savings goal from the database, and
- * the running sum of all SAVINGS-type expenses. Whenever either changes — e.g. the user adds a
- * savings expense elsewhere in the app — the savings screen updates automatically.
+ * the running sum of all SAVING-type transactions dated up to today. Whenever either changes —
+ * e.g. the user adds a savings transaction elsewhere in the app — the savings screen updates
+ * automatically.
  */
 @HiltViewModel
 class SavingsViewModel @Inject constructor(
@@ -81,7 +82,7 @@ class SavingsViewModel @Inject constructor(
 /**
  * Immutable snapshot of the Savings screen's UI state.
  *
- * [currentSaved] is computed — not stored — as: goal.startingAmount + savings expenses total.
+ * [currentSaved] is computed — not stored — as: goal.startingAmount + savings transactions total.
  * [isEditingStartingAmount] drives the dialog for setting the pre-app savings seed value.
  */
 data class SavingsUiState(

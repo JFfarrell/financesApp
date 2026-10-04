@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup rules for Android 11 and below. Everything in the app's data directory (including
+  the Room database) is backed up by default; only the entries below are left out.
+-->
+<full-backup-content>
+    <!-- Holds the password hash; do not copy it into cloud backups. -->
+    <exclude domain="file" path="datastore/auth_prefs.preferences_pb" />
+</full-backup-content>

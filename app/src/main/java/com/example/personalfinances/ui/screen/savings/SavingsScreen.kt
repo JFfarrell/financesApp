@@ -1,6 +1,17 @@
 package com.example.personalfinances.ui.screen.savings
 
 import androidx.compose.foundation.layout.Arrangement
+import com.example.personalfinances.ui.theme.wallet
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,50 +43,70 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.personalfinances.ui.component.CircularProgressArc
-import com.example.personalfinances.util.CurrencyFormatter
+import com.example.personalfinances.ui.theme.LocalMoneyFormatter
 
 /**
  * Root composable for the Savings screen.
  *
  * Displays a circular progress arc showing progress toward the savings goal. The "Saved" total
- * is computed automatically from the starting amount + all SAVINGS-type expenses — it cannot be
+ * is computed automatically from the starting amount + all SAVING transactions — it cannot be
  * edited directly. The user can set a "Starting Amount" (pre-app savings seed) and a goal target.
  *
- * When the user adds a SAVINGS expense anywhere in the app, this screen updates automatically
+ * When the user adds a savings transaction anywhere in the app, this screen updates automatically
  * because both data sources are combined reactively in [SavingsViewModel].
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val wallet = MaterialTheme.wallet
+    val money = LocalMoneyFormatter.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Savings Goal") },
-                actions = {
-                    IconButton(onClick = { viewModel.onEvent(SavingsEvent.ShowEditTarget) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit target")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Box(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+    ) {
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (uiState.isLoading) {
+            Text("Savings", style = MaterialTheme.typography.headlineSmall)
+            IconButton(
+                onClick = { viewModel.onEvent(SavingsEvent.ShowEditTarget) },
+                modifier = Modifier.size(44.dp),
+                colors = IconButtonDefaults.iconButtonColors(containerColor = wallet.cardTonal)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit target")
+            }
+        }
+
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            } else {
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(wallet.card)
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        // progressFraction now takes currentSaved as a parameter because the value
+                        // progressFraction takes currentSaved as a parameter because the value
                         // is computed at runtime, not stored on the model.
                         CircularProgressArc(
                             progressFraction = uiState.goal.progressFraction(uiState.currentSaved),
@@ -88,32 +117,35 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
                             text = "${(uiState.goal.progressFraction(uiState.currentSaved) * 100).toInt()}%",
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = wallet.saving
                         )
                     }
 
                     Text(
-                        text = "Saved: ${CurrencyFormatter.format(uiState.currentSaved)}",
+                        text = "Saved: ${money.format(uiState.currentSaved)}",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Goal: ${CurrencyFormatter.format(uiState.goal.targetAmount)}",
+                        text = "Goal: ${money.format(uiState.goal.targetAmount)}",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = wallet.muted
                     )
                     Text(
-                        text = "Starting amount: ${CurrencyFormatter.format(uiState.goal.startingAmount)}",
+                        text = "Starting amount: ${money.format(uiState.goal.startingAmount)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = wallet.muted
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Sets the pre-app savings seed value. This is distinct from "Update Amount
-                    // Saved" — the user isn't manually tracking a total, just seeding the baseline.
-                    Button(onClick = { viewModel.onEvent(SavingsEvent.ShowEditStartingAmount) }) {
-                        Text("Set Starting Amount")
-                    }
+                // Sets the pre-app savings seed value: savings that existed before using the app.
+                // The saved total itself is computed, never typed in.
+                Button(
+                    onClick = { viewModel.onEvent(SavingsEvent.ShowEditStartingAmount) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                ) {
+                    Text("Set starting amount")
                 }
             }
         }

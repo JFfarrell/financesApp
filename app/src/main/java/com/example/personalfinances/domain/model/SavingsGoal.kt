@@ -7,7 +7,7 @@ package com.example.personalfinances.domain.model
  *
  * [startingAmount] is a one-time seed value representing savings that existed before the user
  * started tracking in this app. It is the only stored value — the actual "current saved" total
- * is computed in the ViewModel as: startingAmount + sum of all SAVINGS-type expenses.
+ * is computed in the ViewModel as: startingAmount + sum of all SAVING transactions up to today.
  *
  * [progressFraction] is a convenience property for the progress arc UI component. It requires
  * the computed [currentSaved] to be passed in, since it is not stored on this model.
@@ -19,7 +19,7 @@ data class SavingsGoal(
     /**
      * Returns a progress fraction between 0.0 and 1.0 based on [currentSaved] vs [targetAmount].
      *
-     * [currentSaved] should be passed as: startingAmount + sum of all SAVINGS expenses.
+     * [currentSaved] should be passed as: startingAmount + sum of all SAVING transactions.
      */
     fun progressFraction(currentSaved: Double): Float =
         if (targetAmount <= 0.0) 0f

@@ -10,8 +10,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.personalfinances.ui.screen.auth.LoginScreen
 import com.example.personalfinances.ui.screen.dashboard.DashboardScreen
+import com.example.personalfinances.ui.screen.manage.ManageScreen
 import com.example.personalfinances.ui.screen.monthly.CalendarScreen
 import com.example.personalfinances.ui.screen.savings.SavingsScreen
+import com.example.personalfinances.ui.screen.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -29,14 +31,27 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
         composable(AppDestination.Main.route) {
-            MainScaffold()
+            MainScaffold(
+                onLogout = {
+                    // Back to the login screen; dropping Main also discards the tab screens' state.
+                    navController.navigate(AppDestination.Login.route) {
+                        popUpTo(AppDestination.Main.route) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }
 
+/**
+ * The signed-in app shell: the tab destinations, the Settings and Manage screens reached from
+ * Home, and the floating bottom bar. [onLogout] is called when the user chooses Log out in
+ * Settings.
+ */
 @Composable
-fun MainScaffold() {
+fun MainScaffold(onLogout: () -> Unit) {
     val bottomNavController = rememberNavController()
+
     Scaffold(
         bottomBar = { BottomNavBar(navController = bottomNavController) }
     ) { innerPadding ->
@@ -45,9 +60,23 @@ fun MainScaffold() {
             startDestination = AppDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(AppDestination.Home.route)     { DashboardScreen() }
+            composable(AppDestination.Home.route) {
+                DashboardScreen(
+                    onOpenSettings = { bottomNavController.navigate(AppDestination.Settings.route) }
+                )
+            }
             composable(AppDestination.Calendar.route) { CalendarScreen() }
             composable(AppDestination.Savings.route)  { SavingsScreen() }
+            composable(AppDestination.Settings.route) {
+                SettingsScreen(
+                    onBack = { bottomNavController.popBackStack() },
+                    onManage = { bottomNavController.navigate(AppDestination.Manage.route) },
+                    onLogout = onLogout
+                )
+            }
+            composable(AppDestination.Manage.route) {
+                ManageScreen(onBack = { bottomNavController.popBackStack() })
+            }
         }
     }
 }

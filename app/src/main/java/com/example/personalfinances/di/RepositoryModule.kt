@@ -1,13 +1,21 @@
 package com.example.personalfinances.di
 
 import com.example.personalfinances.data.repository.AuthRepositoryImpl
-import com.example.personalfinances.data.repository.ExpenseRepositoryImpl
-import com.example.personalfinances.data.repository.IncomeRepositoryImpl
+import com.example.personalfinances.data.repository.BackupRepositoryImpl
+import com.example.personalfinances.data.repository.CategoryRepositoryImpl
+import com.example.personalfinances.data.repository.MerchantRepositoryImpl
+import com.example.personalfinances.data.repository.ReportRepositoryImpl
 import com.example.personalfinances.data.repository.SavingsGoalRepositoryImpl
+import com.example.personalfinances.data.repository.SettingsRepositoryImpl
+import com.example.personalfinances.data.repository.TransactionRepositoryImpl
 import com.example.personalfinances.domain.repository.AuthRepository
-import com.example.personalfinances.domain.repository.ExpenseRepository
-import com.example.personalfinances.domain.repository.IncomeRepository
+import com.example.personalfinances.domain.repository.BackupRepository
+import com.example.personalfinances.domain.repository.CategoryRepository
+import com.example.personalfinances.domain.repository.MerchantRepository
+import com.example.personalfinances.domain.repository.ReportRepository
 import com.example.personalfinances.domain.repository.SavingsGoalRepository
+import com.example.personalfinances.domain.repository.SettingsRepository
+import com.example.personalfinances.domain.repository.TransactionRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -25,14 +33,26 @@ import javax.inject.Singleton
 abstract class RepositoryModule {
 
     @Binds @Singleton
-    abstract fun bindExpenseRepository(impl: ExpenseRepositoryImpl): ExpenseRepository
-
-    @Binds @Singleton
-    abstract fun bindIncomeRepository(impl: IncomeRepositoryImpl): IncomeRepository
-
-    @Binds @Singleton
     abstract fun bindSavingsGoalRepository(impl: SavingsGoalRepositoryImpl): SavingsGoalRepository
 
     @Binds @Singleton
     abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    @Binds @Singleton
+    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds @Singleton
+    abstract fun bindCategoryRepository(impl: CategoryRepositoryImpl): CategoryRepository
+
+    @Binds @Singleton
+    abstract fun bindMerchantRepository(impl: MerchantRepositoryImpl): MerchantRepository
+
+    @Binds @Singleton
+    abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
+
+    @Binds @Singleton
+    abstract fun bindReportRepository(impl: ReportRepositoryImpl): ReportRepository
+
+    @Binds @Singleton
+    abstract fun bindTransactionRepository(impl: TransactionRepositoryImpl): TransactionRepository
 }
